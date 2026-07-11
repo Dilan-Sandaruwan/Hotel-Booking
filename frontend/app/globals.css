@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Custom Color Palette ── */
+  --color-navy-950: #050d1a;
+  --color-navy-900: #0F172A;
+  --color-navy-800: #1E293B;
+  --color-navy-700: #334155;
+  --color-navy-600: #475569;
+
+  --color-gold-600: #B8882F;
+  --color-gold-500: #D4A853;
+  --color-gold-400: #E2BC77;
+  --color-gold-300: #EBCF9B;
+
+  --color-cream-100: #FEF9F0;
+  --color-cream-200: #FCEFD6;
+
+  /* Fonts are injected via CSS variables set by next/font in layout.tsx */
+  --font-sans:    var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, serif;
+}
+
+/* ── Base Styles ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0F172A;
+  color: #E2E8F0;
+  font-family: var(--font-inter, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair, Georgia, serif);
+  line-height: 1.2;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1E293B; }
+::-webkit-scrollbar-thumb { background: #B8882F; border-radius: 3px; }
+
+/* ── Keyframe Animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,168,83,0.5); }
+  50%       { box-shadow: 0 0 0 14px rgba(212,168,83,0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in-up  { animation: fadeInUp  0.65s ease both; }
+.animate-fade-in     { animation: fadeIn    0.5s ease both; }
+.animate-slide-down  { animation: slideDown 0.4s ease both; }
+.animate-float-y     { animation: floatY    3.5s ease-in-out infinite; }
+.animate-pulse-gold  { animation: pulseGold 2s ease infinite; }
+.animate-spin-loader { animation: spin      0.8s linear infinite; }
+
+.delay-100 { animation-delay: 0.10s; }
+.delay-200 { animation-delay: 0.20s; }
+.delay-300 { animation-delay: 0.30s; }
+.delay-400 { animation-delay: 0.40s; }
+.delay-500 { animation-delay: 0.50s; }
+
+/* ── Gradient Text ── */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #D4A853, #E2BC77);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glassmorphism ── */
+.glass {
+  background: rgba(30, 41, 59, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(212, 168, 83, 0.18);
+  border-radius: 1.25rem;
+}
+
+.glass-dark {
+  background: rgba(5, 13, 26, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.25rem;
+}
+
+/* ── Gold Divider ── */
+.divider-gold {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(212,168,83,0.35), transparent);
+  margin: 1.75rem 0;
+}
+
+/* ── Hotel Card Image Zoom ── */
+.hotel-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.hotel-card:hover .hotel-card-img {
+  transform: scale(1.07);
+}
