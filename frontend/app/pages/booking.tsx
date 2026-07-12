@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getHotelById } from "../data/hotels";
+import { useUser } from "../context/UserContext";
 
 type Step = 1 | 2 | 3;
 
@@ -13,6 +14,8 @@ interface PaymentInfo { cardNumber: string; cardName: string; expiry: string; cv
 export default function BookingPage() {
   const router = useRouter();
   const params = useSearchParams();
+  const { user: loggedInUser, isLoggedIn } = useUser();
+
   const hotelId = params.get("hotelId") ?? "1";
   const roomId = params.get("roomId") ?? "";
   const checkIn = params.get("checkIn") ?? "";
@@ -31,6 +34,26 @@ export default function BookingPage() {
   const [payment, setPayment] = useState<PaymentInfo>({ cardNumber: "", cardName: "", expiry: "", cvv: "" });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Check if user is logged in. If not, redirect.
+    const rawUser = localStorage.getItem("luxestay_user");
+    if (!rawUser) {
+      const currentUrl = window.location.pathname + window.location.search;
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+    } else {
+      try {
+        const u = JSON.parse(rawUser);
+        setGuest((prev) => ({
+          ...prev,
+          firstName: prev.firstName || u.firstName || "",
+          lastName: prev.lastName || u.lastName || "",
+          email: prev.email || u.email || "",
+          phone: prev.phone || u.phone || "",
+        }));
+      } catch {}
+    }
+  }, [router]);
 
   const handleConfirm = async () => {
     setLoading(true);

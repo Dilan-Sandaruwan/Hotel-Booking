@@ -2,9 +2,35 @@ import React from "react";
 import Link from "next/link";
 
 export default function Sidebar({ activeTab, setActiveTab, handleLogout, hotelsCount }) {
+  const [ownerName, setOwnerName] = React.useState("Owner");
+  const [initials, setInitials] = React.useState("OW");
+
+  React.useEffect(() => {
+    try {
+      const email = localStorage.getItem("ownerLoggedIn");
+      if (email) {
+        const raw = localStorage.getItem("luxestay_registered_owners");
+        if (raw) {
+          const owners = JSON.parse(raw);
+          const current = owners.find((o) => o.email.toLowerCase().trim() === email.toLowerCase().trim());
+          if (current) {
+            const name = current.name || current.businessName || "Owner";
+            setOwnerName(name);
+            const words = name.trim().split(" ");
+            const init = words.length > 1 
+              ? `${words[0][0]}${words[1][0]}` 
+              : name.substring(0, 2);
+            setInitials(init.toUpperCase());
+          }
+        }
+      }
+    } catch {}
+  }, [activeTab]);
+
   const menuItems = [
     { id: "overview", label: "Overview", icon: "📊" },
     { id: "add-hotel", label: "Add Hotel", icon: "🏨" },
+    { id: "rooms", label: "Add Rooms", icon: "🛏" },
     { id: "bookings", label: "My Bookings", icon: "📅" },
   ];
 
@@ -54,10 +80,10 @@ export default function Sidebar({ activeTab, setActiveTab, handleLogout, hotelsC
             <div className={`w-9 h-9 rounded-lg bg-gradient-to-br from-gold-500 to-gold-400 flex items-center justify-center text-navy-900 font-black text-sm shadow-md group-hover:scale-105 transition-all ${
               activeTab === "profile" ? "ring-2 ring-gold-500" : ""
             }`}>
-              AD
+              {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-white text-xs font-bold truncate">Awantha de S.</p>
+              <p className="text-white text-xs font-bold truncate">{ownerName}</p>
               <p className="text-slate-500 text-[10px] truncate">Owner Account</p>
             </div>
           </button>

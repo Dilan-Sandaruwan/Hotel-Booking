@@ -4,21 +4,70 @@ import React, { useState } from "react";
 
 export default function OwnerProfile() {
   const [profile, setProfile] = useState({
-    name: "Awantha de Silva",
-    email: "partner@luxestay.com",
-    phone: "+94 77 987 6543",
-    companyName: "LuxeStay Resorts Ltd",
-    registrationNo: "PV-98241",
-    joinedDate: "October 14, 2025",
+    name: "Business Owner",
+    email: "",
+    phone: "",
+    companyName: "",
+    registrationNo: "",
+    joinedDate: "",
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [tempProfile, setTempProfile] = useState({ ...profile });
   const [saved, setSaved] = useState(false);
 
+  React.useEffect(() => {
+    try {
+      const email = localStorage.getItem("ownerLoggedIn");
+      if (email) {
+        const raw = localStorage.getItem("luxestay_registered_owners");
+        if (raw) {
+          const owners = JSON.parse(raw);
+          const current = owners.find((o: any) => o.email.toLowerCase().trim() === email.toLowerCase().trim());
+          if (current) {
+            const data = {
+              name: current.name || current.businessName || "Business Owner",
+              email: current.email,
+              phone: current.phone || "",
+              companyName: current.businessName || current.companyName || "",
+              registrationNo: current.registrationNo || "",
+              joinedDate: current.joinedDate || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+            };
+            setProfile(data);
+            setTempProfile(data);
+          }
+        }
+      }
+    } catch {}
+  }, []);
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setProfile({ ...tempProfile });
+
+    try {
+      const email = localStorage.getItem("ownerLoggedIn");
+      if (email) {
+        const raw = localStorage.getItem("luxestay_registered_owners");
+        if (raw) {
+          const owners = JSON.parse(raw);
+          const updated = owners.map((o: any) => {
+            if (o.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+              return {
+                ...o,
+                name: tempProfile.name,
+                businessName: tempProfile.companyName,
+                phone: tempProfile.phone,
+                registrationNo: tempProfile.registrationNo,
+              };
+            }
+            return o;
+          });
+          localStorage.setItem("luxestay_registered_owners", JSON.stringify(updated));
+        }
+      }
+    } catch {}
+
     setIsEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

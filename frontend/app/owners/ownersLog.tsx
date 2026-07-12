@@ -20,11 +20,51 @@ export default function OwnersLoginPage() {
       return;
     }
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setIsLoading(false);
     
-    localStorage.setItem("ownerLoggedIn", "true");
-    router.push("/owners/dashboard");
+    try {
+      const response = await fetch("http://localhost:5000/api/owners/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      setIsLoading(false);
+
+      if (!response.ok) {
+        setError(data.error || "Failed to log in.");
+        return;
+      }
+
+      const emailLower = email.toLowerCase().trim();
+
+      let registeredOwners = [];
+      try {
+        const raw = localStorage.getItem("luxestay_registered_owners");
+        if (raw) registeredOwners = JSON.parse(raw);
+      } catch {}
+
+      if (!registeredOwners.some((o: any) => o.email.toLowerCase().trim() === emailLower)) {
+        registeredOwners.push({
+          name: data.owner.fullName,
+          phone: data.owner.contactNumber,
+          registrationNo: data.owner.nationalIdPassport,
+          birthday: data.owner.birthday,
+          email: emailLower,
+          joinedDate: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+        });
+        localStorage.setItem("luxestay_registered_owners", JSON.stringify(registeredOwners));
+      }
+
+      localStorage.setItem("ownerLoggedIn", emailLower);
+      localStorage.setItem("ownerLoggedInId", data.owner.id);
+      router.push("/owners/dashboard");
+    } catch (err) {
+      setIsLoading(false);
+      setError("Failed to connect to the authentication server.");
+    }
   }
 
   return (

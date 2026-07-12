@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "../context/UserContext";
 
 function PasswordStrength({ password }: { password: string }) {
@@ -45,7 +45,9 @@ function PasswordStrength({ password }: { password: string }) {
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setUser, setIsLoggedIn } = useUser();
+  const redirect = searchParams.get("redirect") ?? "/";
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [showPwd, setShowPwd] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -77,33 +79,59 @@ export default function SignupPage() {
       return;
     }
     setIsLoading(true);
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 1600));
-    setIsLoading(false);
     
-    // Set user info dynamically
-    const names = form.name.trim().split(" ");
-    const firstName = names[0] || "Guest";
-    const lastName = names.slice(1).join(" ") || "User";
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: form.name,
+          email: form.email,
+          password: form.password,
+          termsAccepted: agreed,
+        }),
+      });
 
-    setUser({
-      firstName: firstName,
-      lastName: lastName,
-      email: form.email,
-      phone: "+94 77 123 4567",
-      country: "Sri Lanka",
-      city: "Colombo",
-      dateOfBirth: "1995-05-15",
-      nationality: "Sri Lankan",
-      passportNumber: "N1234567",
-      preferredCurrency: "LKR",
-      preferredLanguage: "English",
-      newsletterOptIn: true,
-      avatar: "",
-    });
-    setIsLoggedIn(true);
+      const data = await response.json();
+      setIsLoading(false);
 
-    router.push("/");
+      if (!response.ok) {
+        setError(data.error || "Failed to register.");
+        return;
+      }
+
+      // Set user info dynamically
+      const names = form.name.trim().split(" ");
+      const firstName = names[0] || "Guest";
+      const lastName = names.slice(1).join(" ") || "User";
+
+      const newUser = {
+        firstName: firstName,
+        lastName: lastName,
+        email: form.email,
+        phone: "",
+        country: "",
+        city: "",
+        dateOfBirth: "",
+        nationality: "",
+        passportNumber: "",
+        preferredCurrency: "LKR",
+        preferredLanguage: "English",
+        newsletterOptIn: true,
+        avatar: "",
+        token: data.token,
+      };
+
+      setUser(newUser);
+      setIsLoggedIn(true);
+
+      router.push(redirect);
+    } catch (err) {
+      setIsLoading(false);
+      setError("Failed to connect to the authentication server.");
+    }
   }
 
   return (

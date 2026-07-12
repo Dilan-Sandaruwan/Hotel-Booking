@@ -2,12 +2,14 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "../context/UserContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setUser, setIsLoggedIn } = useUser();
+  const redirect = searchParams.get("redirect") ?? "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,32 +24,56 @@ export default function LoginPage() {
       return;
     }
     setIsLoading(true);
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 1400));
-    setIsLoading(false);
     
-    // Set user info dynamically
-    const namePart = email.split("@")[0];
-    const firstName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-    
-    setUser({
-      firstName: firstName,
-      lastName: "User",
-      email: email,
-      phone: "+94 77 123 4567",
-      country: "Sri Lanka",
-      city: "Colombo",
-      dateOfBirth: "1995-05-15",
-      nationality: "Sri Lankan",
-      passportNumber: "N1234567",
-      preferredCurrency: "LKR",
-      preferredLanguage: "English",
-      newsletterOptIn: true,
-      avatar: "",
-    });
-    setIsLoggedIn(true);
-    
-    router.push("/");
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      setIsLoading(false);
+
+      if (!response.ok) {
+        setError(data.error || "Failed to log in.");
+        return;
+      }
+
+      // Extract details from backend response
+      const fullName = data.user.fullName || "User";
+      const names = fullName.trim().split(" ");
+      const firstName = names[0] || "Guest";
+      const lastName = names.slice(1).join(" ") || "User";
+
+      const matchedUser = {
+        firstName: firstName,
+        lastName: lastName,
+        email: data.user.email,
+        phone: "",
+        country: "",
+        city: "",
+        dateOfBirth: "",
+        nationality: "",
+        passportNumber: "",
+        preferredCurrency: "LKR",
+        preferredLanguage: "English",
+        newsletterOptIn: true,
+        avatar: "",
+        token: data.token,
+      };
+
+      // Set user info dynamically
+      setUser(matchedUser);
+      setIsLoggedIn(true);
+      
+      router.push(redirect);
+    } catch (err) {
+      setIsLoading(false);
+      setError("Failed to connect to the authentication server.");
+    }
   }
 
   return (

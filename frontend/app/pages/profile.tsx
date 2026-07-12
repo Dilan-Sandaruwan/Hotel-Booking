@@ -75,29 +75,13 @@ function SelectField({
 type SectionKey = "personal" | "travel" | "preferences" | "security";
 
 export default function ProfilePage() {
-  const { user, setUser, isLoggedIn, setIsLoggedIn, initials } = useUser();
+  const { user, setUser, isLoggedIn, setIsLoggedIn, logout, initials } = useUser();
   const router = useRouter();
   const [form, setForm] = useState<UserProfile>({ ...user });
   const [activeSection, setActiveSection] = useState<SectionKey>("personal");
 
   const handleSignOut = () => {
-    localStorage.removeItem("luxestay_user");
-    setIsLoggedIn(false);
-    setUser({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      country: "",
-      city: "",
-      dateOfBirth: "",
-      nationality: "",
-      passportNumber: "",
-      preferredCurrency: "LKR",
-      preferredLanguage: "English",
-      newsletterOptIn: false,
-      avatar: "",
-    });
+    logout();
     router.push("/");
   };
   const [saved, setSaved] = useState(false);

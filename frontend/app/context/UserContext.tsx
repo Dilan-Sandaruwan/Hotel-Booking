@@ -39,6 +39,7 @@ interface UserContextType {
   setUser: (u: UserProfile) => void;
   isLoggedIn: boolean;
   setIsLoggedIn: (v: boolean) => void;
+  logout: () => void;
   initials: string;
 }
 
@@ -47,6 +48,7 @@ const UserContext = createContext<UserContextType>({
   setUser: () => {},
   isLoggedIn: false,
   setIsLoggedIn: () => {},
+  logout: () => {},
   initials: "",
 });
 
@@ -70,6 +72,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem("luxestay_user", JSON.stringify(u)); } catch {}
   };
 
+  const logout = () => {
+    setUserState(DEFAULT_PROFILE);
+    setIsLoggedIn(false);
+    try {
+      localStorage.removeItem("luxestay_user");
+    } catch {}
+  };
+
   const initials = user.firstName && user.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
     : user.email
@@ -77,7 +87,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     : "?";
 
   return (
-    <UserContext.Provider value={{ user, setUser, isLoggedIn, setIsLoggedIn, initials }}>
+    <UserContext.Provider value={{ user, setUser, isLoggedIn, setIsLoggedIn, logout, initials }}>
       {children}
     </UserContext.Provider>
   );

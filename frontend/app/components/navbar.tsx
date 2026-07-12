@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/hotels", label: "Hotels" },
   { href: "/my-bookings", label: "My Bookings" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Navbar() {
@@ -18,6 +19,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<"login" | "signup" | null>(null);
+  const [hotels, setHotels] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     setIsOwnerLoggedIn(localStorage.getItem("ownerLoggedIn") === "true");
@@ -27,6 +29,17 @@ export default function Navbar() {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/hotels")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setHotels(data.map((h: any) => ({ id: h.id, name: h.property_name })));
+        }
+      })
+      .catch((err) => console.error(err));
   }, []);
 
   // Close dropdown on click outside
@@ -68,15 +81,53 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="px-4 py-2 rounded-full text-slate-300 hover:text-gold-400 hover:bg-gold-500/10 font-medium text-sm transition-all duration-200"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {NAV_LINKS.map((link) => {
+              if (link.label === "Hotels") {
+                return (
+                  <div key={link.href} className="relative group/hotels z-50">
+                    <Link
+                      href={link.href}
+                      className="px-4 py-2 rounded-full text-slate-300 hover:text-gold-400 hover:bg-gold-500/10 font-medium text-sm transition-all duration-200 flex items-center gap-1 cursor-pointer"
+                    >
+                      {link.label} <span className="text-[8px] opacity-60">▼</span>
+                    </Link>
+                    {/* Hover Dropdown */}
+                    <div className="absolute left-0 mt-1.5 w-64 rounded-2xl bg-navy-950/95 backdrop-blur-xl border border-gold-500/20 py-2 shadow-2xl z-50 opacity-0 invisible group-hover/hotels:opacity-100 group-hover/hotels:visible transition-all duration-200">
+                      <Link
+                        href="/hotels"
+                        className="block px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gold-400 hover:bg-gold-500/10 transition-all border-b border-gold-500/10 mb-1"
+                      >
+                        All Hotels
+                      </Link>
+                      <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gold-500/20">
+                        {hotels.length > 0 ? (
+                          hotels.map((h) => (
+                            <Link
+                              key={h.id}
+                              href={`/hotels/${h.id}`}
+                              className="block px-4 py-2 text-sm text-slate-350 hover:text-gold-400 hover:bg-gold-500/10 transition-all font-medium truncate"
+                            >
+                              🏨 {h.name}
+                            </Link>
+                          ))
+                        ) : (
+                          <span className="block px-4 py-2 text-xs text-slate-500 italic">No hotels registered</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="px-4 py-2 rounded-full text-slate-300 hover:text-gold-400 hover:bg-gold-500/10 font-medium text-sm transition-all duration-200"
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* CTA Buttons */}

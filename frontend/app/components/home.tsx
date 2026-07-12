@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { HOTELS } from "../data/hotels";
 
@@ -46,7 +46,46 @@ function StarRating({ count }: { count: number }) {
 }
 
 export default function Home() {
-  const featured = HOTELS.slice(0, 6);
+  const [mounted, setMounted] = useState(false);
+  const [hotels, setHotels] = useState<any[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+    fetch("http://localhost:5000/api/hotels")
+      .then((res) => res.json())
+      .then((data) => {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category.toLowerCase(),
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+        }));
+        setHotels(mapped);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  const featured = mounted ? hotels.slice(0, 6) : [];
 
   return (
     <>

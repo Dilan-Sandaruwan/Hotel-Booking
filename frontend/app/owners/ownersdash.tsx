@@ -26,6 +26,20 @@ const AMENITIES_BY_CATEGORY = {
   ]
 };
 
+const COMMON_AMENITIES = [
+  "Free WiFi",
+  "Free parking",
+  "Indoor swimming pool",
+  "Spa & Wellness",
+  "Fine Dining Restaurant",
+  "Room service",
+  "Fitness Center",
+  "Bar / Lounge",
+  "Air conditioning",
+  "Beachfront access",
+  "24-Hour Front Desk",
+];
+
 export default function OwnersDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
@@ -42,109 +56,463 @@ export default function OwnersDashboard() {
   const [newHotelImgUrl, setNewHotelImgUrl] = useState("");
   const [newHotelCategory, setNewHotelCategory] = useState("luxury");
   const [newHotelRooms, setNewHotelRooms] = useState("10");
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([
+    "Free WiFi",
+    "Free parking",
+  ]);
 
   // Rooms State
-  const [roomsList, setRoomsList] = useState<any[]>([]);
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
-  const [newRoomNo, setNewRoomNo] = useState("");
-  const [newRoomPrice, setNewRoomPrice] = useState("");
-  const [newRoomType, setNewRoomType] = useState("single");
+  const [selectedHotelId, setSelectedHotelId] = useState("");
+  const [roomNumber, setRoomNumber] = useState("");
+  const [roomFeatures, setRoomFeatures] = useState("");
+  const [roomBedRoom, setRoomBedRoom] = useState("");
+  const [roomExtraFeatures, setRoomExtraFeatures] = useState("");
+  const [roomPrice, setRoomPrice] = useState("12000");
+  const [roomImages, setRoomImages] = useState<string[]>([]);
+  const [roomPersonCount, setRoomPersonCount] = useState("2");
+  const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
+  const [editingRoomId, setEditingRoomId] = useState("");
 
   useEffect(() => {
     // Check auth
     const auth = localStorage.getItem("ownerLoggedIn");
+    const ownerId = localStorage.getItem("ownerLoggedInId");
     if (!auth) {
       router.push("/owners/login");
+    } else {
+      // Load hotels from backend matching ownerId (or email fallback)
+      fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const mapped = data.map((h: any) => ({
+              id: h.id,
+              name: h.property_name,
+              location: h.city,
+              country: h.country,
+              description: h.short_description,
+              longDescription: h.long_description,
+              stars: h.stars,
+              rating: 5.0,
+              reviewCount: 1,
+              price: parseFloat(h.starting_price_per_night),
+              imageUrl: h.image_url,
+              gallery: [h.image_url],
+              amenities: h.amenities,
+              category: h.category,
+              rooms: (h.rooms || []).map((r: any) => ({
+                id: r.id,
+                name: r.room_name,
+                bedType: r.bed_type,
+                price: parseFloat(r.price_per_night),
+                amenities: [...r.features, ...r.extra_features],
+                images: r.image_urls || [],
+                mode: r.mode || "active",
+                capacity: r.max_person_count || 2,
+              })),
+              status: "Active",
+              revenue: 0,
+              bookings: 0,
+              roomsCount: h.rooms ? h.rooms.length : 0,
+              ownerEmail: auth,
+            }));
+            setHotels(mapped);
+          }
+        })
+        .catch((err) => console.error(err));
     }
-    // Load hotels from DB/localStorage
-    setHotels([...HOTELS]);
   }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("ownerLoggedIn");
+    localStorage.removeItem("ownerLoggedInId");
     router.push("/");
   };
 
-  const handleAddRoom = (room: any) => {
-    setRoomsList([...roomsList, room]);
-  };
-
-  const handleAddHotel = (e: React.FormEvent) => {
+  const handleAddHotel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHotelName || !newHotelLoc || !newHotelCountry || !newHotelPrice) return;
 
-    const newHotelId = `H-${Math.floor(100 + Math.random() * 900)}`;
+    const auth = localStorage.getItem("ownerLoggedIn") || "";
+    const ownerId = localStorage.getItem("ownerLoggedInId") || "";
     const newPriceVal = parseFloat(newHotelPrice) || 10000;
 
-    // Create new Hotel matching exactly the schema required by getHotelById and homepage
-    const newHotelObj = {
-      id: newHotelId,
-      name: newHotelName,
-      location: newHotelLoc,
-      country: newHotelCountry,
-      description: newHotelDesc,
-      longDescription: newHotelLongDesc,
-      stars: parseInt(newHotelStars) || 5,
-      rating: 5.0,
-      reviewCount: 1,
-      price: newPriceVal,
-      imageUrl: newHotelImgUrl || "https://picsum.photos/seed/resort/600/400",
-      gallery: [newHotelImgUrl || "https://picsum.photos/seed/resort/600/400"],
-      amenities: ["Free WiFi", "Free parking", "Restaurant", "Non-smoking rooms", "Room service"],
-      featured: true,
-      category: newHotelCategory as any,
-      rooms: roomsList.length > 0 ? roomsList.map((r, index) => ({
-        id: `r-${newHotelId}-${index + 1}`,
-        name: r.name,
-        capacity: r.capacity,
-        bedType: r.bedType,
-        price: r.price,
-        size: r.size,
-        amenities: r.amenities,
-      })) : [
-        {
-          id: `r-${newHotelId}-1`,
-          name: "Standard Room",
-          capacity: 2,
-          bedType: "Double Bed",
-          price: newPriceVal,
-          size: "35 m²",
-          amenities: ["Attach Bathroom", "TV", "Free WiFi"],
+    try {
+      const response = await fetch("http://localhost:5000/api/hotels", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ownerId,
+          ownerEmail: auth,
+          propertyName: newHotelName,
+          city: newHotelLoc,
+          country: newHotelCountry,
+          startingPricePerNight: newPriceVal,
+          category: newHotelCategory,
+          stars: parseInt(newHotelStars) || 5,
+          totalRooms: parseInt(newHotelRooms) || 10,
+          imageUrl: newHotelImgUrl || "https://picsum.photos/seed/resort/600/400",
+          shortDescription: newHotelDesc,
+          longDescription: newHotelLongDesc,
+          amenities: selectedAmenities,
+        }),
+      });
+
+      if (!response.ok) {
+        alert("Failed to add hotel to the database.");
+        return;
+      }
+
+      // Reload hotels from backend
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      }
+
+      // Reset Form
+      setNewHotelName("");
+      setNewHotelLoc("");
+      setNewHotelCountry("");
+      setNewHotelDesc("");
+      setNewHotelLongDesc("");
+      setNewHotelStars("5");
+      setNewHotelPrice("15000");
+      setNewHotelImgUrl("");
+      setNewHotelCategory("luxury");
+      setNewHotelRooms("10");
+      setSelectedAmenities(["Free WiFi", "Free parking"]);
+
+      setActiveTab("overview"); // Redirect back to overview after adding
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    }
+  };
+
+  const handleAddNewRoom = async () => {
+    if (!selectedHotelId || !roomNumber) return;
+
+    const selectedHotel = hotels.find((h) => h.id === selectedHotelId);
+    if (!selectedHotel) return;
+
+    const featuresList = roomFeatures
+      ? roomFeatures.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    const extraList = roomExtraFeatures
+      ? roomExtraFeatures.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const auth = localStorage.getItem("ownerLoggedIn") || "";
+    const ownerId = localStorage.getItem("ownerLoggedInId") || "";
+
+    try {
+      const response = await fetch("http://localhost:5000/api/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hotelId: selectedHotelId,
+          roomName: roomNumber,
+          bedType: roomBedRoom || "Double Bed",
+          features: featuresList,
+          extraFeatures: extraList,
+          pricePerNight: parseFloat(roomPrice) || 12000,
+          imageUrls: roomImages,
+          maxPersonCount: parseInt(roomPersonCount) || 2,
+          mode: "active"
+        }),
+      });
+
+      if (!response.ok) {
+        alert("Failed to add room to database.");
+        return;
+      }
+
+      // Reload hotels from backend to get updated rooms
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      }
+
+      setIsAddRoomOpen(false);
+
+      setRoomNumber("");
+      setRoomFeatures("");
+      setRoomBedRoom("");
+      setRoomExtraFeatures("");
+      setRoomPrice("12000");
+      setRoomPersonCount("2");
+      setRoomImages([]);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    }
+  };
+
+  const handleRoomImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    
+    if (roomImages.length + files.length > 6) {
+      alert("You can upload a maximum of 6 images.");
+      return;
+    }
+    
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          setRoomImages((prev) => [...prev, reader.result].slice(0, 6));
         }
-      ],
-      // Dashboard UI helper properties
-      status: "Active" as const, // Pending approval part removed
-      revenue: 0,
-      bookings: 0,
-      roomsCount: roomsList.length > 0 ? roomsList.length : parseInt(newHotelRooms) || 10,
-    };
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
-    // Save to localStorage & database module
-    addHotel(newHotelObj);
+  const removeRoomImage = (index: number) => {
+    setRoomImages((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    // Sync state
-    setHotels([...HOTELS]);
+  const handleToggleMaintenance = async (room: any) => {
+    const newMode = room.mode === "maintenance" ? "active" : "maintenance";
+    const auth = localStorage.getItem("ownerLoggedIn") || "";
+    const ownerId = localStorage.getItem("ownerLoggedInId") || "";
 
-    // Reset Form
-    setNewHotelName("");
-    setNewHotelLoc("");
-    setNewHotelCountry("");
-    setNewHotelDesc("");
-    setNewHotelLongDesc("");
-    setNewHotelStars("5");
-    setNewHotelPrice("15000");
-    setNewHotelImgUrl("");
-    setNewHotelCategory("luxury");
-    setNewHotelRooms("10");
-    setRoomsList([]);
+    try {
+      const response = await fetch(`http://localhost:5000/api/rooms/${room.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomName: room.name,
+          bedType: room.bedType,
+          pricePerNight: room.price,
+          features: room.amenities,
+          extraFeatures: [],
+          imageUrls: room.images,
+          mode: newMode,
+          maxPersonCount: room.capacity,
+        }),
+      });
 
-    setActiveTab("overview"); // Redirect back to overview after adding
+      if (!response.ok) {
+        alert("Failed to update room status.");
+        return;
+      }
+
+      // Reload hotels from backend to sync
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    }
+  };
+
+  const handleStartEditRoom = (room: any) => {
+    setEditingRoomId(room.id);
+    setRoomNumber(room.name);
+    setRoomBedRoom(room.bedType);
+    setRoomFeatures(room.amenities.join(", "));
+    setRoomExtraFeatures("");
+    setRoomPrice(room.price.toString());
+    setRoomPersonCount(room.capacity.toString());
+    setRoomImages(room.images || []);
+    setIsEditRoomOpen(true);
+  };
+
+  const handleSaveEditRoom = async () => {
+    if (!editingRoomId || !roomNumber) return;
+
+    const auth = localStorage.getItem("ownerLoggedIn") || "";
+    const ownerId = localStorage.getItem("ownerLoggedInId") || "";
+    const featuresList = roomFeatures
+      ? roomFeatures.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/rooms/${editingRoomId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomName: roomNumber,
+          bedType: roomBedRoom || "Double Bed",
+          pricePerNight: parseFloat(roomPrice) || 12000,
+          features: featuresList,
+          extraFeatures: [],
+          imageUrls: roomImages,
+          mode: "active", // Default/Preserve active on full edit
+          maxPersonCount: parseInt(roomPersonCount) || 2,
+        }),
+      });
+
+      if (!response.ok) {
+        alert("Failed to modify room in database.");
+        return;
+      }
+
+      // Reload hotels from backend to get updated rooms
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      }
+
+      setIsEditRoomOpen(false);
+      setEditingRoomId("");
+
+      setRoomNumber("");
+      setRoomFeatures("");
+      setRoomBedRoom("");
+      setRoomExtraFeatures("");
+      setRoomPrice("12000");
+      setRoomPersonCount("2");
+      setRoomImages([]);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    }
   };
 
   const totalRevenue = hotels.reduce((sum, h) => sum + (h.revenue || 0), 0);
   const activeListings = hotels.filter((h) => h.status === "Active").length;
   const totalBookings = hotels.reduce((sum, h) => sum + (h.bookings || 0), 0);
-  const totalViews = totalBookings * 15;
 
   return (
     <div className="min-h-screen bg-navy-900 text-slate-100 flex">
@@ -177,17 +545,15 @@ export default function OwnersDashboard() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               {[
-                { title: "Total Revenue", value: `LKR ${totalRevenue.toLocaleString()}`, change: totalRevenue > 0 ? "+14.2% this month" : "No revenue yet", icon: "💰" },
-                { title: "Active Listings", value: `${activeListings}`, change: activeListings > 0 ? "All properties verified" : "No active listings", icon: "🏢" },
-                { title: "Total Bookings", value: `${totalBookings} Stay${totalBookings !== 1 ? "s" : ""}`, change: totalBookings > 0 ? "Tracking reservations" : "No bookings yet", icon: "📅" },
-                { title: "Total Views", value: `${totalViews} View${totalViews !== 1 ? "s" : ""}`, change: totalViews > 0 ? "Page traffic active" : "No page views", icon: "👁️" }
+                { title: "Total Revenue", value: `LKR ${totalRevenue.toLocaleString()}`, icon: "💰" },
+                { title: "Active Listings", value: `${activeListings}`, icon: "🏢" },
+                { title: "Total Bookings", value: `${totalBookings} Stay${totalBookings !== 1 ? "s" : ""}`, icon: "📅" }
               ].map((stat, i) => (
                 <div key={i} className="glass p-5 rounded-2xl">
                   <div className="flex justify-between items-start">
                     <span className="text-2xl">{stat.icon}</span>
-                    <span className="text-emerald-400 text-xs font-semibold">{stat.change}</span>
                   </div>
                   <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-4">{stat.title}</p>
                   <h3 className="text-white font-black text-2xl mt-1 font-display">{stat.value}</h3>
@@ -253,11 +619,10 @@ export default function OwnersDashboard() {
               <p className="text-slate-500 text-sm mt-1">Register a new hotel or resort to start receiving guest bookings</p>
             </div>
 
-            <form onSubmit={handleAddHotel} className="w-full">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                
-                {/* Left Side: Form Details Card */}
-                <div className="glass p-6 md:p-8 rounded-2xl h-full flex flex-col justify-between">
+            <form onSubmit={handleAddHotel} className="w-full max-w-6xl mx-auto">
+              <div className="glass p-6 md:p-8 rounded-2xl flex flex-col justify-between">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column: Basic Information */}
                   <div className="space-y-6">
                     <h3 className="text-gold-500 text-sm font-bold uppercase tracking-wider border-b border-gold-500/10 pb-2">Property Information</h3>
                     
@@ -361,257 +726,519 @@ export default function OwnersDashboard() {
                         />
                       </div>
                     </div>
+                  </div>
 
+                  {/* Right Column: Descriptions & Amenities */}
+                  <div className="space-y-6">
+                    <h3 className="text-gold-500 text-sm font-bold uppercase tracking-wider border-b border-gold-500/10 pb-2">Details & Amenities</h3>
+
+                    <div className="space-y-5">
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Short Description *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newHotelDesc}
+                          onChange={(e) => setNewHotelDesc(e.target.value)}
+                          placeholder="Brief tagline showing on search listings"
+                          className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-655 text-sm focus:outline-none focus:border-gold-500/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Detailed Long Description *</label>
+                        <textarea
+                          required
+                          rows={4}
+                          value={newHotelLongDesc}
+                          onChange={(e) => setNewHotelLongDesc(e.target.value)}
+                          placeholder="Provide full description of your property, services, and location highlight..."
+                          className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-655 text-sm focus:outline-none focus:border-gold-500/50 resize-y"
+                        />
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Amenities *</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 rounded-xl bg-navy-800/40 border border-gold-500/15">
+                          {COMMON_AMENITIES.map((amenity) => {
+                            const checked = selectedAmenities.includes(amenity);
+                            return (
+                              <label key={amenity} className="flex items-center gap-2 text-slate-350 text-sm cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    if (checked) {
+                                      setSelectedAmenities(selectedAmenities.filter((a) => a !== amenity));
+                                    } else {
+                                      setSelectedAmenities([...selectedAmenities, amenity]);
+                                    }
+                                  }}
+                                  className="accent-gold-500 rounded border-gold-500/20"
+                                />
+                                <span>{amenity}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-6 border-t border-gold-500/10 mt-8">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("overview")}
+                    className="px-5 py-2.5 rounded-full border border-gold-500/30 text-slate-400 text-sm font-semibold hover:text-gold-400 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-sm shadow-lg shadow-gold-500/20 hover:-translate-y-0.5 transition-all cursor-pointer"
+                  >
+                    Register & Activate Property
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Render Rooms Tab */}
+        {activeTab === "rooms" && (
+          <div className="animate-fade-in w-full">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold font-display text-white">Manage & Add Rooms</h2>
+              <p className="text-slate-500 text-sm mt-1">Select a registered property to view current configurations or append new rooms</p>
+            </div>
+
+            <div className="glass p-6 md:p-8 rounded-2xl mb-8 max-w-3xl">
+              <h3 className="text-gold-500 text-sm font-bold uppercase tracking-wider border-b border-gold-500/10 pb-2 mb-6">Select Property</h3>
+              
+              <div className="flex flex-col md:flex-row md:items-end gap-5">
+                <div className="flex-1 space-y-1.5">
+                  <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Choose Hotel *</label>
+                  <select
+                    value={selectedHotelId}
+                    onChange={(e) => setSelectedHotelId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50 appearance-none cursor-pointer [color-scheme:dark]"
+                  >
+                    <option value="">-- Choose Hotel --</option>
+                    {hotels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name} (📍 {h.location})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <button
+                  type="button"
+                  disabled={!selectedHotelId}
+                  onClick={() => {
+                    setRoomNumber("");
+                    setRoomFeatures("");
+                    setRoomBedRoom("");
+                    setRoomExtraFeatures("");
+                    setRoomPrice("12000");
+                    setIsAddRoomOpen(true);
+                  }}
+                  className={`px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all cursor-pointer whitespace-nowrap h-[46px] flex items-center justify-center ${
+                    selectedHotelId
+                      ? "bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 shadow-gold-500/20 hover:-translate-y-0.5"
+                      : "bg-navy-800 text-slate-500 border border-navy-700 cursor-not-allowed"
+                  }`}
+                >
+                  + Add Room
+                </button>
+              </div>
+            </div>
+
+            {/* Room cards display for the selected hotel */}
+            {selectedHotelId && (() => {
+              const selectedHotel = hotels.find((h) => h.id === selectedHotelId);
+              const rooms = selectedHotel?.rooms || [];
+
+              return (
+                <div className="glass p-6 md:p-8 rounded-2xl w-full">
+                  <h3 className="text-white text-lg font-bold mb-6 flex items-center gap-2 border-b border-gold-500/10 pb-3">
+                    <span>🛏</span> Room Configurations — {selectedHotel?.name}
+                  </h3>
+
+                  {rooms.length === 0 ? (
+                    <div className="text-center py-16 border-2 border-dashed border-gold-500/10 rounded-2xl">
+                      <div className="text-4xl mb-3">🛏</div>
+                      <h4 className="text-slate-400 font-semibold mb-1">No rooms added to this property yet</h4>
+                      <p className="text-slate-600 text-xs">Click the "+ Add Room" button above to register a room configuration.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                       {rooms.map((r: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className={`p-5 rounded-2xl bg-navy-800/40 border flex flex-col justify-between hover:border-gold-500/30 transition-all duration-300 relative ${
+                            r.mode === "maintenance"
+                              ? "border-amber-500/30 opacity-80 grayscale-[20%]"
+                              : "border-gold-500/12"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-white font-bold font-display text-base leading-snug">{r.name}</h4>
+                                {r.mode === "maintenance" && (
+                                  <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-[9px] text-amber-400 font-extrabold uppercase tracking-wider">
+                                    Maintenance
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-gold-400 text-sm font-black whitespace-nowrap">LKR {r.price.toLocaleString()}</span>
+                            </div>
+                            
+                            <p className="text-slate-350 text-xs mb-3 flex items-center gap-1.5">
+                              🛏 <span className="font-semibold text-slate-200">{r.bedType}</span>
+                              <span className="text-slate-500">|</span>
+                              👤 <span className="font-semibold text-slate-200">Max {r.capacity} guests</span>
+                            </p>
+
+                            {r.images && r.images.length > 0 && (
+                              <div className="flex gap-1.5 overflow-x-auto py-1 mb-3">
+                                {r.images.map((img: string, i: number) => (
+                                  <img key={i} src={img} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-gold-500/10" />
+                                ))}
+                              </div>
+                            )}
+
+                            {r.amenities && r.amenities.length > 0 && (
+                              <div className="space-y-2 mt-4 pt-3 border-t border-gold-500/5">
+                                <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Features & Extras:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {r.amenities.map((a: string, i: number) => (
+                                    <span key={i} className="px-2.5 py-0.5 rounded-full bg-gold-500/5 border border-gold-500/15 text-[10px] text-slate-400">
+                                      {a}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Card Actions */}
+                          <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-gold-500/5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMaintenance(r)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex-1 ${
+                                r.mode === "maintenance"
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+                                  : "bg-navy-900 border-gold-500/15 text-slate-400 hover:text-white hover:border-gold-500/35"
+                              }`}
+                            >
+                              🔧 {r.mode === "maintenance" ? "Active" : "Maintain"}
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditRoom(r)}
+                              className="px-3 py-1.5 rounded-lg bg-gold-500/10 border border-gold-500/20 text-gold-400 hover:bg-gold-500/20 text-xs font-bold transition-all cursor-pointer flex-1"
+                            >
+                              ✍ Edit
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Add Room Modal Popup */}
+            {isAddRoomOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/85 backdrop-blur-sm p-4">
+                <div className="bg-navy-900 border border-gold-500/30 rounded-2xl w-full max-w-lg p-6 relative animate-fade-in shadow-2xl">
+                  {/* Close Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAddRoomOpen(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer text-lg"
+                  >
+                    ✕
+                  </button>
+
+                  {/* Header */}
+                  <div className="border-b border-gold-500/10 pb-3 mb-5">
+                    <h3 className="text-white text-lg font-bold font-display">Configure New Room</h3>
+                    <p className="text-slate-500 text-xs mt-0.5">Add a new room configuration details for your property</p>
+                  </div>
+
+                  {/* Popup Form Fields */}
+                  <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Short Description *</label>
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Number / Name *</label>
                       <input
                         type="text"
                         required
-                        value={newHotelDesc}
-                        onChange={(e) => setNewHotelDesc(e.target.value)}
-                        placeholder="Brief tagline showing on search listings"
-                        className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-655 text-sm focus:outline-none focus:border-gold-500/50"
+                        value={roomNumber}
+                        onChange={(e) => setRoomNumber(e.target.value)}
+                        placeholder="e.g. Deluxe Suite 302"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Detailed Long Description *</label>
-                      <textarea
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Bed Room / Bed Type *</label>
+                      <input
+                        type="text"
                         required
-                        rows={5}
-                        value={newHotelLongDesc}
-                        onChange={(e) => setNewHotelLongDesc(e.target.value)}
-                        placeholder="Provide full description of your property, services, and location highlight..."
-                        className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-655 text-sm focus:outline-none focus:border-gold-500/50 resize-y"
+                        value={roomBedRoom}
+                        onChange={(e) => setRoomBedRoom(e.target.value)}
+                        placeholder="e.g. 1 King Bed, 2 Double Beds"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
                       />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Features (Comma separated) *</label>
+                      <input
+                        type="text"
+                        value={roomFeatures}
+                        onChange={(e) => setRoomFeatures(e.target.value)}
+                        placeholder="e.g. WiFi, TV, AC, Attached Bathroom"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Extra Features (Comma separated)</label>
+                      <input
+                        type="text"
+                        value={roomExtraFeatures}
+                        onChange={(e) => setRoomExtraFeatures(e.target.value)}
+                        placeholder="e.g. Sea View, Private Balcony, Mini Bar"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Price per Night (LKR) *</label>
+                      <input
+                        type="number"
+                        required
+                        value={roomPrice}
+                        onChange={(e) => setRoomPrice(e.target.value)}
+                        placeholder="12000"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Max Capacity (Guests) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={roomPersonCount}
+                        onChange={(e) => setRoomPersonCount(e.target.value)}
+                        placeholder="2"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Images (Max 6)</label>
+                      <div className="flex flex-wrap gap-2.5 mb-2">
+                        {roomImages.map((img, idx) => (
+                          <div key={idx} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gold-500/20 group">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeRoomImage(idx)}
+                              className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity duration-200 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        {roomImages.length < 6 && (
+                          <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gold-500/20 hover:border-gold-500/40 flex flex-col items-center justify-center text-slate-500 hover:text-gold-400 cursor-pointer transition-colors bg-navy-800/40">
+                            <span className="text-xl leading-none">+</span>
+                            <span className="text-[10px] mt-0.5">Upload</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleRoomImageUpload}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-6 border-t border-gold-500/10 mt-8">
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gold-500/10">
                     <button
                       type="button"
-                      onClick={() => setActiveTab("overview")}
+                      onClick={() => setIsAddRoomOpen(false)}
                       className="px-5 py-2.5 rounded-full border border-gold-500/30 text-slate-400 text-sm font-semibold hover:text-gold-400 transition-all cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
-                      type="submit"
+                      type="button"
+                      onClick={handleAddNewRoom}
                       className="px-6 py-2.5 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-sm shadow-lg shadow-gold-500/20 hover:-translate-y-0.5 transition-all cursor-pointer"
                     >
-                      Register & Activate Property
+                      Add
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Right Side: Rooms Preview and Action */}
-                <div className="glass p-6 md:p-8 rounded-2xl space-y-6 h-full flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-center border-b border-gold-500/10 pb-4 mb-4">
-                      <div>
-                        <h3 className="text-gold-500 text-sm font-bold uppercase tracking-wider">Hotel Rooms</h3>
-                        <p className="text-slate-500 text-xs mt-1">Configure and add rooms to this property listing</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewRoomNo("");
-                          setNewRoomPrice("");
-                          setNewRoomType("single");
-                          setIsAddRoomOpen(true);
-                        }}
-                        className="px-4 py-2 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-xs hover:-translate-y-0.5 transition-all cursor-pointer"
-                      >
-                        + Add Room
-                      </button>
+            {/* Edit Room Modal Popup */}
+            {isEditRoomOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/85 backdrop-blur-sm p-4">
+                <div className="bg-navy-900 border border-gold-500/30 rounded-2xl w-full max-w-lg p-6 relative animate-fade-in shadow-2xl">
+                  {/* Close Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditRoomOpen(false);
+                      setEditingRoomId("");
+                    }}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer text-lg"
+                  >
+                    ✕
+                  </button>
+
+                  {/* Header */}
+                  <div className="border-b border-gold-500/10 pb-3 mb-5">
+                    <h3 className="text-white text-lg font-bold font-display">Modify Room Details</h3>
+                    <p className="text-slate-500 text-xs mt-0.5">Edit room details and configuration settings</p>
+                  </div>
+
+                  {/* Popup Form Fields */}
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Number / Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={roomNumber}
+                        onChange={(e) => setRoomNumber(e.target.value)}
+                        placeholder="e.g. Deluxe Suite 302"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
                     </div>
 
-                    {roomsList.length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-gold-500/10 rounded-2xl">
-                        <div className="text-3xl mb-2">🛏</div>
-                        <p className="text-slate-500 text-xs font-semibold">No rooms added to this property yet.</p>
-                        <p className="text-slate-600 text-[10px] mt-1">Click the "+ Add Room" button to configure your first room type.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                        {roomsList.map((r, idx) => (
-                          <div key={idx} className="p-4 rounded-xl bg-navy-800/40 border border-gold-500/10 flex justify-between items-center">
-                            <div>
-                              <h4 className="text-white text-sm font-bold">{r.name}</h4>
-                              <p className="text-slate-500 text-xs mt-1">
-                                {r.bedType} · {r.size} · Up to {r.capacity} guests
-                              </p>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {r.amenities.map((a: string) => (
-                                  <span key={a} className="px-2 py-0.5 rounded-full bg-gold-500/5 border border-gold-500/10 text-[9px] text-slate-400">
-                                    {a}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-gold-500 text-base font-black">LKR {r.price}</span>
-                              <span className="text-slate-600 text-[10px] block">per night</span>
-                            </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Bed Room / Bed Type *</label>
+                      <input
+                        type="text"
+                        required
+                        value={roomBedRoom}
+                        onChange={(e) => setRoomBedRoom(e.target.value)}
+                        placeholder="e.g. 1 King Bed, 2 Double Beds"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Features (Comma separated) *</label>
+                      <input
+                        type="text"
+                        value={roomFeatures}
+                        onChange={(e) => setRoomFeatures(e.target.value)}
+                        placeholder="e.g. WiFi, TV, AC, Attached Bathroom"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Price per Night (LKR) *</label>
+                      <input
+                        type="number"
+                        required
+                        value={roomPrice}
+                        onChange={(e) => setRoomPrice(e.target.value)}
+                        placeholder="12000"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Max Capacity (Guests) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={roomPersonCount}
+                        onChange={(e) => setRoomPersonCount(e.target.value)}
+                        placeholder="2"
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Images (Max 6)</label>
+                      <div className="flex flex-wrap gap-2.5 mb-2">
+                        {roomImages.map((img, idx) => (
+                          <div key={idx} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gold-500/20 group">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeRoomImage(idx)}
+                              className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity duration-200 cursor-pointer"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Landscape Add Room Modal Popup */}
-                {isAddRoomOpen && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/85 backdrop-blur-sm p-4">
-                    <div className="bg-navy-900 border border-gold-500/30 rounded-2xl w-full max-w-3xl p-6 relative animate-fade-in shadow-2xl">
-                      {/* Close Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsAddRoomOpen(false)}
-                        className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer text-lg"
-                      >
-                        ✕
-                      </button>
-
-                      {/* Header */}
-                      <div className="border-b border-gold-500/10 pb-3 mb-5">
-                        <h3 className="text-white text-lg font-bold font-display">Configure New Room</h3>
-                        <p className="text-slate-500 text-xs mt-0.5">Define room configurations, pricing, and amenities</p>
-                      </div>
-
-                      {/* Landscape Modal Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                        {/* Form Inputs (Left side of modal) */}
-                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room No / Name *</label>
+                        {roomImages.length < 6 && (
+                          <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gold-500/20 hover:border-gold-500/40 flex flex-col items-center justify-center text-slate-500 hover:text-gold-400 cursor-pointer transition-colors bg-navy-800/40">
+                            <span className="text-xl leading-none">+</span>
+                            <span className="text-[10px] mt-0.5">Upload</span>
                             <input
-                              type="text"
-                              required
-                              value={newRoomNo}
-                              onChange={(e) => setNewRoomNo(e.target.value)}
-                              placeholder="e.g. Deluxe Room 101"
-                              className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleRoomImageUpload}
                             />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Price per Night (LKR) *</label>
-                            <input
-                              type="number"
-                              required
-                              value={newRoomPrice}
-                              onChange={(e) => setNewRoomPrice(e.target.value)}
-                              placeholder="12000"
-                              className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-gold-500/50"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Room Type *</label>
-                            <select
-                              value={newRoomType}
-                              onChange={(e) => setNewRoomType(e.target.value)}
-                              className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50 appearance-none cursor-pointer [color-scheme:dark]"
-                            >
-                              <option value="single">Single Room</option>
-                              <option value="double">Double Room</option>
-                              <option value="family">Family Room</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Auto-selected Specs Preview (Right side of modal) */}
-                        <div className="bg-navy-800/40 border border-gold-500/10 p-5 rounded-xl space-y-4">
-                          <h4 className="text-gold-500 text-xs font-bold uppercase tracking-wider border-b border-gold-500/5 pb-2">Auto-selected Specifications</h4>
-                          
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-xs">Bed Setup:</span>
-                              <span className="text-slate-200 font-bold">
-                                {newRoomType === "single" && "🛏 Single Bed"}
-                                {newRoomType === "double" && "🛏 2 Double Beds"}
-                                {newRoomType === "family" && "🛏 3 Beds"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-xs">Capacity:</span>
-                              <span className="text-slate-200 font-bold">
-                                {newRoomType === "single" && "👤 1 Guest"}
-                                {newRoomType === "double" && "👤 2 Guests"}
-                                {newRoomType === "family" && "👤 Up to 8 Guests"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-xs">Room Size:</span>
-                              <span className="text-slate-200 font-bold">
-                                {newRoomType === "single" && "📐 30 m²"}
-                                {newRoomType === "double" && "📐 45 m²"}
-                                {newRoomType === "family" && "📐 80 m²"}
-                              </span>
-                            </div>
-
-                            <div className="pt-2">
-                              <span className="text-slate-500 text-xs font-bold block mb-2">Amenities Included:</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {newRoomType === "single" && ["Attach Bathroom", "TV", "Single Bed"].map(a => (
-                                  <span key={a} className="px-2 py-0.5 rounded bg-gold-500/5 border border-gold-500/15 text-[10px] text-slate-350">✓ {a}</span>
-                                ))}
-                                {newRoomType === "double" && ["Attach Bathroom", "TV", "2 Double Beds"].map(a => (
-                                  <span key={a} className="px-2 py-0.5 rounded bg-gold-500/5 border border-gold-500/15 text-[10px] text-slate-350">✓ {a}</span>
-                                ))}
-                                {newRoomType === "family" && ["Attach Bathroom", "TV", "3 Beds"].map(a => (
-                                  <span key={a} className="px-2 py-0.5 rounded bg-gold-500/5 border border-gold-500/15 text-[10px] text-slate-350">✓ {a}</span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Modal Actions */}
-                      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gold-500/10">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddRoomOpen(false)}
-                          className="px-5 py-2.5 rounded-full border border-gold-500/30 text-slate-400 text-sm font-semibold hover:text-gold-400 transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!newRoomNo || !newRoomPrice) return;
-                            const capacity = newRoomType === "single" ? 1 : newRoomType === "double" ? 2 : 8;
-                            const bedType = newRoomType === "single" ? "Single" : newRoomType === "double" ? "2 Double Beds" : "3 Beds";
-                            const size = newRoomType === "single" ? "30 m²" : newRoomType === "double" ? "45 m²" : "80 m²";
-                            const amenities = newRoomType === "single"
-                              ? ["Attach Bathroom", "TV", "Single Bed"]
-                              : newRoomType === "double"
-                              ? ["Attach Bathroom", "TV", "2 Double Beds"]
-                              : ["Attach Bathroom", "TV", "3 Beds"];
-
-                            handleAddRoom({
-                              name: newRoomNo,
-                              price: parseFloat(newRoomPrice) || 10000,
-                              capacity,
-                              bedType,
-                              size,
-                              amenities,
-                            });
-                            setIsAddRoomOpen(false);
-                          }}
-                          className="px-6 py-2.5 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-sm shadow-lg shadow-gold-500/20 hover:-translate-y-0.5 transition-all cursor-pointer"
-                        >
-                          Add Room
-                        </button>
+                          </label>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
 
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gold-500/10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditRoomOpen(false);
+                        setEditingRoomId("");
+                      }}
+                      className="px-5 py-2.5 rounded-full border border-gold-500/30 text-slate-400 text-sm font-semibold hover:text-gold-400 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEditRoom}
+                      className="px-6 py-2.5 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-sm shadow-lg shadow-gold-500/20 hover:-translate-y-0.5 transition-all cursor-pointer"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         )}
 

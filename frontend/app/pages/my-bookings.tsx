@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Booking } from "../data/hotels";
 import { useUser } from "../context/UserContext";
 
@@ -23,10 +24,25 @@ function StatusBadge({ status }: { status: Booking["status"] }) {
 }
 
 export default function MyBookingsPage() {
-  const { user, initials } = useUser();
+  const router = useRouter();
+  const { isLoggedIn, user, initials } = useUser();
   const [activeTab, setActiveTab] = useState<"upcoming" | "past" | "all">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const now = new Date();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push("/login");
+    }
+  }, [isLoggedIn, router]);
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-navy-900 flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const filtered = MOCK_BOOKINGS.filter((b) => {
     const checkOut = new Date(b.checkOut);

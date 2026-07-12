@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { HOTELS } from "../data/hotels";
 
@@ -12,14 +12,53 @@ function StarRating({ count }: { count: number }) {
 }
 
 export default function HotelsPage() {
+  const [mounted, setMounted] = useState(false);
+  const [hotels, setHotels] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("all");
-  const [maxPrice, setMaxPrice] = useState(5000);
+  const [maxPrice, setMaxPrice] = useState(50000);
   const [minStars, setMinStars] = useState(0);
   const [sort, setSort] = useState<SortKey>("rating");
 
+  useEffect(() => {
+    setMounted(true);
+    fetch("http://localhost:5000/api/hotels")
+      .then((res) => res.json())
+      .then((data) => {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category.toLowerCase(),
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+        }));
+        setHotels(mapped);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = HOTELS.filter((h) => {
+    if (!mounted) return [];
+    let list = hotels.filter((h) => {
       const q = search.toLowerCase();
       const matchSearch = !q || h.name.toLowerCase().includes(q) || h.location.toLowerCase().includes(q);
       const matchCat = category === "all" || h.category === category;
@@ -103,16 +142,16 @@ export default function HotelsPage() {
               {/* Price Range */}
               <div className="mb-6">
                 <label className="block text-xs font-bold uppercase tracking-widest text-gold-300 mb-2">
-                  Max Price: <span className="text-gold-500">LKR {maxPrice}</span>/night
+                  Max Price: <span className="text-gold-500">LKR {maxPrice.toLocaleString()}</span>/night
                 </label>
                 <input
-                  type="range" min={200} max={5000} step={50}
+                  type="range" min={1000} max={50000} step={500}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(+e.target.value)}
                   className="w-full accent-gold-500"
                 />
                 <div className="flex justify-between text-slate-600 text-xs mt-1">
-                  <span>LKR 200</span><span>LKR 5,000</span>
+                  <span>LKR 1,000</span><span>LKR 50,000</span>
                 </div>
               </div>
 
@@ -138,7 +177,7 @@ export default function HotelsPage() {
 
               {/* Reset */}
               <button
-                onClick={() => { setSearch(""); setCategory("all"); setMaxPrice(5000); setMinStars(0); }}
+                onClick={() => { setSearch(""); setCategory("all"); setMaxPrice(50000); setMinStars(0); }}
                 className="w-full py-2.5 rounded-full border border-gold-500 text-gold-400 text-sm font-semibold hover:bg-gold-500/10 transition-all duration-200 cursor-pointer"
               >
                 Reset Filters

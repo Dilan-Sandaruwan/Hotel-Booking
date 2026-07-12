@@ -17,6 +17,12 @@ export interface Hotel {
   featured?: boolean;
   category: "luxury" | "boutique" | "resort" | "business";
   rooms: Room[];
+  // Dashboard UI helper properties
+  status?: "Active" | "Pending" | "Inactive";
+  revenue?: number;
+  bookings?: number;
+  roomsCount?: number;
+  ownerEmail?: string;
 }
 
 export interface Room {
@@ -27,6 +33,8 @@ export interface Room {
   price: number;
   size: string;
   amenities: string[];
+  images?: string[];
+  mode?: "active" | "maintenance";
 }
 
 export interface Booking {
@@ -46,6 +54,9 @@ export interface Booking {
   guestEmail: string;
 }
 
+const DEFAULT_HOTELS: Hotel[] = [];
+
+
 export const HOTELS: Hotel[] = [];
 
 if (typeof window !== "undefined") {
@@ -53,7 +64,13 @@ if (typeof window !== "undefined") {
     const raw = localStorage.getItem("luxestay_hotels");
     if (raw) {
       const parsed = JSON.parse(raw);
-      HOTELS.push(...parsed);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((h: any) => h && h.id !== "H-101" && h.id !== "H-102" && h.id !== "H-103" && h.ownerEmail);
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem("luxestay_hotels", JSON.stringify(filtered));
+        }
+        HOTELS.push(...filtered);
+      }
     }
   } catch {}
 }
