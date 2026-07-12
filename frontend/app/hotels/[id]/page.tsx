@@ -31,7 +31,19 @@ export default function HotelPage() {
             reviewCount: 1,
             price: parseFloat(h.starting_price_per_night) || 0,
             imageUrl: h.image_url || "",
-            gallery: h.image_url ? [h.image_url] : [],
+            gallery: Array.from(
+              new Set([
+                h.image_url,
+                ...(Array.isArray(h.images) ? h.images : []),
+                ...(Array.isArray(h.gallery) ? h.gallery : []),
+                ...((h.rooms || []).flatMap((r: any) => r.image_urls || [])),
+                "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80"
+              ].filter(Boolean))
+            ).slice(0, 6),
             amenities: h.amenities || [],
             category: (h.category || "luxury").toLowerCase(),
             rooms: (h.rooms || []).map((r: any) => ({

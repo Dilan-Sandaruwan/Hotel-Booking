@@ -47,6 +47,24 @@ const create = async (req, res) => {
       return res.status(400).json({ error: "Missing required booking fields" });
     }
 
+    // ── Double-booking prevention ────────────────────────────────
+    const conflict = await bookingModel.checkRoomAvailability(
+      roomId,
+      checkInDate,
+      checkOutDate
+    );
+    if (conflict) {
+      return res.status(409).json({
+        error: "Room is already booked for the selected dates",
+        conflictingBooking: {
+          id: conflict.id,
+          checkIn: conflict.check_in_date,
+          checkOut: conflict.check_out_date,
+        },
+      });
+    }
+    // ─────────────────────────────────────────────────────────────
+
     const booking = await bookingModel.createBooking({
       userId: userId || null,
       hotelId,
@@ -133,4 +151,28 @@ const getByOwner = async (req, res) => {
   }
 };
 
-module.exports = { create, getByUser, getByOwner, getById };
+/**
+ * GET /api/bookings/check-availability?roomId=...&checkIn=...&checkOut=...
+ * Returns { available: true/false } so the frontend can warn users
+ * before they fill out the booking form.
+ */
+const checkAvailability = async (req, res) => {
+  try {
+    const { roomId, checkIn, checkOut } = req.query;
+    if (!roomId || !checkIn || !checkOut) {
+      return res.status(400).json({ error: "roomId, checkIn and checkOut are required" });
+    }
+    const conflict = await bookingModel.checkRoomAvailability(roomId, checkIn, checkOut);
+    res.status(200).json({
+      available: !conflict,
+      conflict: conflict
+        ? { checkIn: conflict.check_in_date, checkOut: conflict.check_out_date }
+        : null,
+    });
+  } catch (error) {
+    console.error("Availability check error:", error);
+    res.status(500).json({ error: "Server error checking availability" });
+  }
+};
+
+module.exports = { create, getByUser, getByOwner, getById, checkAvailability };

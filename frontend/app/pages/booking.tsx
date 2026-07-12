@@ -156,13 +156,24 @@ export default function BookingPage() {
       if (res.ok) {
         const data = await res.json();
         bookingId = data.booking.id; // real UUID from DB
+      } else if (res.status === 409) {
+        // Room is already booked for these dates
+        const errData = await res.json();
+        alert(
+          `⚠️ This room is already booked!\n\n` +
+          `The selected dates conflict with an existing reservation` +
+          (errData.conflictingBooking
+            ? ` (${new Date(errData.conflictingBooking.checkIn).toLocaleDateString()} – ${new Date(errData.conflictingBooking.checkOut).toLocaleDateString()}).`
+            : ".") +
+          `\n\nPlease choose different dates or a different room.`
+        );
+        setStep(1); // Go back to dates step
+        return;
       } else {
-        // Fallback: generate a local ID so the user still sees confirmation
-        bookingId = "LX-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-        console.warn("Booking API failed, using local ID:", bookingId);
+        // Other server error — show a warning
+        alert("Booking failed. Please try again.");
+        return;
       }
-
-      // Always persist a summary to localStorage for the confirmation page
       localStorage.setItem("lastBooking", JSON.stringify({
         bookingId, hotelId: hotel!.id, hotelName: hotel!.name,
         checkIn, checkOut, guests, nights,

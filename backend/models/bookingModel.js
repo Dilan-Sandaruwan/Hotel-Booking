@@ -1,6 +1,28 @@
 const pool = require("../config/db");
 
 /**
+ * Check if a room has any confirmed bookings that overlap with the
+ * requested date range.  Two bookings overlap when:
+ *   existing.check_in  < requested.check_out  AND
+ *   existing.check_out > requested.check_in
+ *
+ * Returns the conflicting booking row, or undefined if available.
+ */
+const checkRoomAvailability = async (roomId, checkInDate, checkOutDate) => {
+  const query = `
+    SELECT id, check_in_date, check_out_date
+    FROM bookings
+    WHERE room_id = $1
+      AND booking_status != 'cancelled'
+      AND check_in_date  < $3::date
+      AND check_out_date > $2::date
+    LIMIT 1;
+  `;
+  const { rows } = await pool.query(query, [roomId, checkInDate, checkOutDate]);
+  return rows[0]; // undefined means room is available
+};
+
+/**
  * Save a new booking to the database.
  * All monetary values should be numbers (NUMERIC(12,2) in Postgres).
  */
@@ -138,6 +160,7 @@ const getBookingsByOwner = async (ownerId) => {
 
 module.exports = {
   createBooking,
+  checkRoomAvailability,
   getBookingsByUser,
   getBookingsByOwner,
   getBookingById,

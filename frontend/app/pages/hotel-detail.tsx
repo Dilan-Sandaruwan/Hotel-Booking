@@ -17,6 +17,8 @@ export default function HotelDetail({ hotel }: Props) {
   const [guests, setGuests] = useState(2);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [modalRoom, setModalRoom] = useState<Room | null>(null);
+  const [roomAvailable, setRoomAvailable] = useState<boolean | null>(null);
+  const [availabilityMsg, setAvailabilityMsg] = useState("");
 
   const room = hotel.rooms?.find((r) => r.id === selectedRoom) ?? hotel.rooms?.[0];
 
@@ -25,6 +27,35 @@ export default function HotelDetail({ hotel }: Props) {
       setGuests(room.capacity);
     }
   }, [room, guests]);
+
+  // Check availability whenever room or dates change
+  React.useEffect(() => {
+    if (!selectedRoom || !checkIn || !checkOut) {
+      setRoomAvailable(null);
+      setAvailabilityMsg("");
+      return;
+    }
+    const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    if (diff <= 0) return;
+
+    const params = new URLSearchParams({ roomId: selectedRoom, checkIn, checkOut });
+    fetch(`http://localhost:5000/api/bookings/check-availability?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRoomAvailable(data.available);
+        if (!data.available && data.conflict) {
+          setAvailabilityMsg(
+            `Already booked ${new Date(data.conflict.checkIn).toLocaleDateString()} – ${new Date(data.conflict.checkOut).toLocaleDateString()}`
+          );
+        } else {
+          setAvailabilityMsg("");
+        }
+      })
+      .catch(() => {
+        setRoomAvailable(null);
+        setAvailabilityMsg("");
+      });
+  }, [selectedRoom, checkIn, checkOut]);
 
   const nights = (() => {
     if (!checkIn || !checkOut) return 0;
@@ -36,6 +67,10 @@ export default function HotelDetail({ hotel }: Props) {
 
   const handleBook = () => {
     if (!room || room.mode === "maintenance") return;
+    if (roomAvailable === false) {
+      alert("This room is not available for the selected dates. Please choose different dates.");
+      return;
+    }
     const params = new URLSearchParams({
       hotelId: hotel.id, roomId: selectedRoom, checkIn, checkOut,
       guests: guests.toString(), nights: nights.toString(), total: total.toString(),
@@ -65,39 +100,91 @@ export default function HotelDetail({ hotel }: Props) {
           {/* Left Column */}
           <div className="flex-1 min-w-0">
 
-            {/* Gallery */}
+            {/* Interactive Image Slider */}
             <div className="mb-8">
-              <div className="relative rounded-2xl overflow-hidden h-96 md:h-[440px] mb-3">
+              <div className="relative rounded-2xl overflow-hidden h-96 md:h-[480px] mb-3 group bg-navy-950 border border-gold-500/20 shadow-2xl">
+                {/* Current Slide Image */}
                 <img
                   src={hotel.gallery[activeImg] ?? hotel.imageUrl}
-                  alt={hotel.name}
-                  className="w-full h-full object-cover transition-opacity duration-400"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://picsum.photos/seed/${hotel.id}gal/1200/700`; }}
+                  alt={`${hotel.name} - Photo ${activeImg + 1}`}
+                  className="w-full h-full object-cover transition-all duration-300"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80";
+                  }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/60 via-transparent to-transparent" />
+
+                {/* Dark Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 via-transparent to-navy-950/30 pointer-events-none" />
+
+                {/* Top Right Photo Counter Badge */}
+                <div className="absolute top-4 right-4 px-3.5 py-1.5 rounded-full bg-navy-900/80 backdrop-blur-md border border-gold-500/30 text-gold-400 text-xs font-bold font-mono shadow-lg flex items-center gap-1.5">
+                  <span>📸</span>
+                  <span>{activeImg + 1} / {hotel.gallery.length} Photos</span>
+                </div>
+
+                {/* Left Arrow Button */}
+                {hotel.gallery.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveImg((prev) => (prev === 0 ? hotel.gallery.length - 1 : prev - 1))}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-navy-900/80 hover:bg-gold-500 text-white hover:text-navy-900 border border-gold-500/40 flex items-center justify-center transition-all duration-200 cursor-pointer shadow-lg group-hover:opacity-100"
+                    aria-label="Previous image"
+                  >
+                    <span className="text-lg font-bold">‹</span>
+                  </button>
+                )}
+
+                {/* Right Arrow Button */}
+                {hotel.gallery.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveImg((prev) => (prev === hotel.gallery.length - 1 ? 0 : prev + 1))}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-navy-900/80 hover:bg-gold-500 text-white hover:text-navy-900 border border-gold-500/40 flex items-center justify-center transition-all duration-200 cursor-pointer shadow-lg group-hover:opacity-100"
+                    aria-label="Next image"
+                  >
+                    <span className="text-lg font-bold">›</span>
+                  </button>
+                )}
+
+                {/* Bottom Left Tags */}
                 <div className="absolute bottom-4 left-4 flex gap-2">
-                  <span className="px-3 py-1 rounded-full bg-gold-500/20 text-gold-400 border border-gold-500/35 text-xs font-semibold">
+                  <span className="px-3 py-1 rounded-full bg-gold-500/20 text-gold-400 border border-gold-500/35 text-xs font-semibold backdrop-blur-sm">
                     {"★".repeat(hotel.stars)} {hotel.stars}-Star
                   </span>
                   {hotel.discount && (
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 text-xs font-semibold">
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 text-xs font-semibold backdrop-blur-sm">
                       -{hotel.discount}% OFF
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {hotel.gallery.map((src, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveImg(i)}
-                    className={`shrink-0 w-24 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${activeImg === i ? "border-gold-500" : "border-transparent opacity-60 hover:opacity-100"}`}
-                  >
-                    <img src={src} alt="" className="w-full h-full object-cover"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://picsum.photos/seed/${hotel.id}${i}/400/300`; }} />
-                  </button>
-                ))}
-              </div>
+
+              {/* Slider Thumbnails Strip */}
+              {hotel.gallery.length > 1 && (
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                  {hotel.gallery.map((src, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setActiveImg(i)}
+                      className={`shrink-0 w-24 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer relative ${
+                        activeImg === i
+                          ? "border-gold-500 scale-105 shadow-md shadow-gold-500/20"
+                          : "border-transparent opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <img
+                        src={src}
+                        alt={`Thumbnail ${i + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80";
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Hotel Info */}
@@ -256,11 +343,30 @@ export default function HotelDetail({ hotel }: Props) {
                 </div>
               )}
 
+              {/* Availability Status Indicator */}
+              {roomAvailable === true && nights > 0 && (
+                <div className="animate-fade-in flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 mb-4">
+                  <span className="text-emerald-400 text-lg">✅</span>
+                  <span className="text-emerald-400 text-sm font-semibold">Room is available for your selected dates!</span>
+                </div>
+              )}
+              {roomAvailable === false && (
+                <div className="animate-fade-in flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
+                  <span className="text-red-400 text-lg">🚫</span>
+                  <div>
+                    <p className="text-red-400 text-sm font-semibold">Room is not available for these dates</p>
+                    {availabilityMsg && <p className="text-red-400/70 text-xs mt-0.5">{availabilityMsg}</p>}
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleBook}
-                disabled={!room || !checkIn || !checkOut || nights <= 0 || room.mode === "maintenance"}
+                disabled={!room || !checkIn || !checkOut || nights <= 0 || room.mode === "maintenance" || roomAvailable === false}
                 className={`w-full py-4 rounded-full font-bold text-base shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 cursor-pointer ${
-                  room?.mode === "maintenance"
+                  roomAvailable === false
+                    ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/20"
+                    : room?.mode === "maintenance"
                     ? "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-amber-500/20"
                     : "bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 shadow-gold-500/30 hover:shadow-gold-500/50 hover:-translate-y-0.5"
                 }`}
@@ -269,6 +375,8 @@ export default function HotelDetail({ hotel }: Props) {
                   ? "No Rooms Available"
                   : room.mode === "maintenance"
                   ? "Under Maintenance"
+                  : roomAvailable === false
+                  ? "Room Unavailable — Choose Different Dates"
                   : !checkIn || !checkOut
                   ? "Select Dates to Book"
                   : `Reserve — LKR ${Math.round(total * 1.12)}`}

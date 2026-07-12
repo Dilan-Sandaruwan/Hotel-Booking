@@ -116,9 +116,57 @@ const getById = async (req, res) => {
   }
 };
 
+const update = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      propertyName,
+      city,
+      country,
+      startingPricePerNight,
+      category,
+      stars,
+      totalRooms,
+      imageUrl,
+      shortDescription,
+      longDescription,
+      amenities
+    } = req.body;
+
+    const updated = await hotelModel.updateHotel(
+      id,
+      propertyName,
+      city,
+      country,
+      startingPricePerNight,
+      category,
+      stars,
+      totalRooms,
+      imageUrl,
+      shortDescription,
+      longDescription,
+      amenities
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Hotel not found" });
+    }
+
+    res.status(200).json({
+      message: "Hotel updated successfully",
+      hotel: updated
+    });
+  } catch (error) {
+    console.error("Hotel update error:", error);
+    res.status(500).json({ error: "Server error updating hotel" });
+  }
+};
+
 module.exports = {
   create,
+  update,
   getOwnerHotels,
   getAll,
   getById,
 };
+

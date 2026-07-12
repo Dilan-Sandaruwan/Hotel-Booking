@@ -54,12 +54,27 @@ export default function OwnersDashboard() {
   const [newHotelStars, setNewHotelStars] = useState("5");
   const [newHotelPrice, setNewHotelPrice] = useState("15000");
   const [newHotelImgUrl, setNewHotelImgUrl] = useState("");
+  const [newHotelImages, setNewHotelImages] = useState<string[]>([]);
   const [newHotelCategory, setNewHotelCategory] = useState("luxury");
   const [newHotelRooms, setNewHotelRooms] = useState("10");
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([
     "Free WiFi",
     "Free parking",
   ]);
+
+  // Edit Hotel State
+  const [isEditHotelOpen, setIsEditHotelOpen] = useState(false);
+  const [editingHotelId, setEditingHotelId] = useState("");
+  const [editHotelName, setEditHotelName] = useState("");
+  const [editHotelLoc, setEditHotelLoc] = useState("");
+  const [editHotelCountry, setEditHotelCountry] = useState("");
+  const [editHotelDesc, setEditHotelDesc] = useState("");
+  const [editHotelLongDesc, setEditHotelLongDesc] = useState("");
+  const [editHotelStars, setEditHotelStars] = useState("5");
+  const [editHotelPrice, setEditHotelPrice] = useState("15000");
+  const [editHotelCategory, setEditHotelCategory] = useState("luxury");
+  const [editHotelRooms, setEditHotelRooms] = useState("10");
+  const [editHotelImages, setEditHotelImages] = useState<string[]>([]);
 
   // Rooms State
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
@@ -179,6 +194,117 @@ export default function OwnersDashboard() {
   }, [activeTab]);
   // ─────────────────────────────────────────────────────────────────────────
 
+  const handleStartEditHotel = (hotel: any) => {
+    setEditingHotelId(hotel.id);
+    setEditHotelName(hotel.name || "");
+    setEditHotelLoc(hotel.location || "");
+    setEditHotelCountry(hotel.country || "");
+    setEditHotelDesc(hotel.description || "");
+    setEditHotelLongDesc(hotel.longDescription || "");
+    setEditHotelStars(hotel.stars?.toString() || "5");
+    setEditHotelPrice(hotel.price?.toString() || "15000");
+    setEditHotelCategory(hotel.category || "luxury");
+    setEditHotelRooms(hotel.roomsCount?.toString() || "10");
+    setEditHotelImages(hotel.gallery || (hotel.imageUrl ? [hotel.imageUrl] : []));
+    setIsEditHotelOpen(true);
+  };
+
+  const handleEditHotelImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    if (editHotelImages.length + files.length > 6) {
+      alert("Maximum 6 photos allowed per property.");
+      return;
+    }
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditHotelImages((prev) => [...prev, reader.result as string].slice(0, 6));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSaveEditHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHotelId) return;
+
+    const auth = localStorage.getItem("ownerLoggedIn") || "";
+    const ownerId = localStorage.getItem("ownerLoggedInId") || "";
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/hotels/${editingHotelId}`, {
+        method: "PUT",
+        headers: ownerHeaders(),
+        body: JSON.stringify({
+          propertyName: editHotelName,
+          city: editHotelLoc,
+          country: editHotelCountry,
+          startingPricePerNight: parseFloat(editHotelPrice) || 15000,
+          category: editHotelCategory,
+          stars: parseInt(editHotelStars) || 5,
+          totalRooms: parseInt(editHotelRooms) || 10,
+          imageUrl: editHotelImages[0] || "https://picsum.photos/seed/resort/600/400",
+          shortDescription: editHotelDesc,
+          longDescription: editHotelLongDesc,
+        }),
+      });
+
+      if (response.status === 401) { handleUnauthorized(); return; }
+
+      if (!response.ok) {
+        alert("Failed to update hotel.");
+        return;
+      }
+
+      // Reload hotels from backend
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      }
+
+      setIsEditHotelOpen(false);
+      setEditingHotelId("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    }
+  };
+
   const handleAddHotel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHotelName || !newHotelLoc || !newHotelCountry || !newHotelPrice) return;
@@ -201,7 +327,7 @@ export default function OwnersDashboard() {
           category: newHotelCategory,
           stars: parseInt(newHotelStars) || 5,
           totalRooms: parseInt(newHotelRooms) || 10,
-          imageUrl: newHotelImgUrl || "https://picsum.photos/seed/resort/600/400",
+          imageUrl: newHotelImages[0] || newHotelImgUrl || "https://picsum.photos/seed/resort/600/400",
           shortDescription: newHotelDesc,
           longDescription: newHotelLongDesc,
           amenities: selectedAmenities,
@@ -263,6 +389,7 @@ export default function OwnersDashboard() {
       setNewHotelStars("5");
       setNewHotelPrice("15000");
       setNewHotelImgUrl("");
+      setNewHotelImages([]);
       setNewHotelCategory("luxury");
       setNewHotelRooms("10");
       setSelectedAmenities(["Free WiFi", "Free parking"]);
@@ -366,6 +493,31 @@ export default function OwnersDashboard() {
       console.error(err);
       alert("Failed to connect to backend server.");
     }
+  };
+
+  const handleHotelImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+
+    if (newHotelImages.length + files.length > 6) {
+      alert("You can upload a maximum of 6 photos.");
+      return;
+    }
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (typeof result === "string") {
+          setNewHotelImages((prev) => [...prev, result].slice(0, 6));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeHotelImage = (index: number) => {
+    setNewHotelImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleRoomImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -639,6 +791,7 @@ export default function OwnersDashboard() {
                         <th className="py-4 px-3">Monthly Bookings</th>
                         <th className="py-4 px-3">Revenue Generated</th>
                         <th className="py-4 px-3 text-right">Status</th>
+                        <th className="py-4 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gold-500/5 text-sm">
@@ -655,6 +808,15 @@ export default function OwnersDashboard() {
                               Active
                             </span>
                           </td>
+                          <td className="py-4 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditHotel(hotel)}
+                              className="px-3.5 py-1.5 rounded-lg bg-gold-500/15 hover:bg-gold-500 text-gold-400 hover:text-navy-900 border border-gold-500/30 text-xs font-bold transition-all duration-200 cursor-pointer"
+                            >
+                              ✏️ Edit
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -662,6 +824,181 @@ export default function OwnersDashboard() {
                 </div>
               )}
             </div>
+
+            {/* Edit Hotel Modal Popup */}
+            {isEditHotelOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/85 backdrop-blur-sm p-4 overflow-y-auto">
+                <div className="bg-navy-900 border border-gold-500/30 rounded-2xl w-full max-w-2xl p-6 relative animate-fade-in shadow-2xl max-h-[90vh] overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditHotelOpen(false);
+                      setEditingHotelId("");
+                    }}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer text-lg"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="border-b border-gold-500/10 pb-3 mb-5">
+                    <h3 className="text-white text-lg font-bold font-display">Modify Property Details</h3>
+                    <p className="text-slate-500 text-xs mt-0.5">Edit hotel information, pricing, and descriptions</p>
+                  </div>
+
+                  <form onSubmit={handleSaveEditHotel} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Property Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editHotelName}
+                          onChange={(e) => setEditHotelName(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Location (City) *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editHotelLoc}
+                          onChange={(e) => setEditHotelLoc(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Country *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editHotelCountry}
+                          onChange={(e) => setEditHotelCountry(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Starting Price per Night (LKR) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={editHotelPrice}
+                          onChange={(e) => setEditHotelPrice(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Category *</label>
+                        <select
+                          value={editHotelCategory}
+                          onChange={(e) => setEditHotelCategory(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50 [color-scheme:dark]"
+                        >
+                          <option value="luxury">Luxury</option>
+                          <option value="boutique">Boutique</option>
+                          <option value="resort">Resort</option>
+                          <option value="business">Business</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Stars *</label>
+                        <select
+                          value={editHotelStars}
+                          onChange={(e) => setEditHotelStars(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50 [color-scheme:dark]"
+                        >
+                          <option value="5">5 Stars</option>
+                          <option value="4">4 Stars</option>
+                          <option value="3">3 Stars</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Short Description *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editHotelDesc}
+                        onChange={(e) => setEditHotelDesc(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Detailed Long Description *</label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={editHotelLongDesc}
+                        onChange={(e) => setEditHotelLongDesc(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 text-sm focus:outline-none focus:border-gold-500/50 resize-y"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">
+                        Hotel Photos (Max 6 Photos)
+                      </label>
+                      <div className="flex flex-wrap gap-2.5 pt-1">
+                        {editHotelImages.map((img, idx) => (
+                          <div
+                            key={idx}
+                            className="relative w-16 h-16 rounded-xl overflow-hidden border border-gold-500/20 group"
+                          >
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setEditHotelImages(editHotelImages.filter((_, i) => i !== idx))}
+                              className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-red-400 font-bold transition-opacity text-xs cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        {editHotelImages.length < 6 && (
+                          <label className="w-16 h-16 rounded-xl border border-dashed border-gold-500/30 flex flex-col items-center justify-center text-gold-400 hover:bg-gold-500/10 cursor-pointer transition-all">
+                            <span className="text-xl">+</span>
+                            <span className="text-[10px] font-bold">Upload</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handleEditHotelImageUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gold-500/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditHotelOpen(false);
+                          setEditingHotelId("");
+                        }}
+                        className="px-5 py-2.5 rounded-full border border-gold-500/30 text-slate-400 text-sm font-semibold hover:text-gold-400 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-2.5 rounded-full bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 font-bold text-sm shadow-lg shadow-gold-500/20 hover:-translate-y-0.5 transition-all cursor-pointer"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -769,15 +1106,40 @@ export default function OwnersDashboard() {
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">Hotel Image URL</label>
-                        <input
-                          type="url"
-                          value={newHotelImgUrl}
-                          onChange={(e) => setNewHotelImgUrl(e.target.value)}
-                          placeholder="https://example.com/image.jpg"
-                          className="w-full px-4 py-3 rounded-xl bg-navy-800/60 border border-gold-500/15 text-slate-100 placeholder-slate-655 text-sm focus:outline-none focus:border-gold-500/50"
-                        />
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="block text-slate-400 text-xs font-semibold tracking-widest uppercase">
+                          Hotel Photos (Max 6 Photos)
+                        </label>
+                        <div className="flex flex-wrap gap-2.5 pt-1">
+                          {newHotelImages.map((img, idx) => (
+                            <div
+                              key={idx}
+                              className="relative w-16 h-16 rounded-xl overflow-hidden border border-gold-500/20 group"
+                            >
+                              <img src={img} alt="" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removeHotelImage(idx)}
+                                className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity duration-200 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          {newHotelImages.length < 6 && (
+                            <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gold-500/20 hover:border-gold-500/40 flex flex-col items-center justify-center text-slate-500 hover:text-gold-400 cursor-pointer transition-colors bg-navy-800/40">
+                              <span className="text-xl leading-none">+</span>
+                              <span className="text-[10px] mt-0.5">Upload</span>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleHotelImageUpload}
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

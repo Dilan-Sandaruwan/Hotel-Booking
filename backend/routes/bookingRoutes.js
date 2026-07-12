@@ -4,6 +4,9 @@ const authOwner = require("../middleware/authOwner");
 
 const router = express.Router();
 
+// Check if a room is available for the given dates (used before booking)
+router.get("/check-availability", bookingController.checkAvailability);
+
 // Create a new booking (called after payment confirmation — guest/user action)
 router.post("/", bookingController.create);
 

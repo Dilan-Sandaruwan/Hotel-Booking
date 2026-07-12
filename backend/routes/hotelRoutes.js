@@ -10,6 +10,8 @@ router.get("/:id", hotelController.getById);
 
 // Protected routes — owner must be authenticated
 router.post("/", authOwner, hotelController.create);
+router.put("/:id", authOwner, hotelController.update);
 router.get("/owner/:ownerId", authOwner, hotelController.getOwnerHotels);
 
 module.exports = router;
+
