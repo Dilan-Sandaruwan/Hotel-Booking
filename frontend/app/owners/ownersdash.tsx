@@ -74,59 +74,82 @@ export default function OwnersDashboard() {
   const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState("");
 
+  // ── JWT helpers ─────────────────────────────────────────────────────────
+  /** Returns headers including the owner JWT for protected API calls. */
+  const ownerHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}`,
+  });
+
+  /** Clears auth state and redirects to login when a 401 is received. */
+  const handleUnauthorized = () => {
+    localStorage.removeItem("ownerLoggedIn");
+    localStorage.removeItem("ownerLoggedInId");
+    localStorage.removeItem("ownerToken");
+    router.push("/owners/login");
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
-    // Check auth
+    // Check auth — both the email flag AND the JWT token must be present
     const auth = localStorage.getItem("ownerLoggedIn");
     const ownerId = localStorage.getItem("ownerLoggedInId");
-    if (!auth) {
+    const token = localStorage.getItem("ownerToken");
+    if (!auth || !token) {
       router.push("/owners/login");
-    } else {
-      // Load hotels from backend matching ownerId (or email fallback)
-      fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data)) {
-            const mapped = data.map((h: any) => ({
-              id: h.id,
-              name: h.property_name,
-              location: h.city,
-              country: h.country,
-              description: h.short_description,
-              longDescription: h.long_description,
-              stars: h.stars,
-              rating: 5.0,
-              reviewCount: 1,
-              price: parseFloat(h.starting_price_per_night),
-              imageUrl: h.image_url,
-              gallery: [h.image_url],
-              amenities: h.amenities,
-              category: h.category,
-              rooms: (h.rooms || []).map((r: any) => ({
-                id: r.id,
-                name: r.room_name,
-                bedType: r.bed_type,
-                price: parseFloat(r.price_per_night),
-                amenities: [...r.features, ...r.extra_features],
-                images: r.image_urls || [],
-                mode: r.mode || "active",
-                capacity: r.max_person_count || 2,
-              })),
-              status: "Active",
-              revenue: 0,
-              bookings: 0,
-              roomsCount: h.rooms ? h.rooms.length : 0,
-              ownerEmail: auth,
-            }));
-            setHotels(mapped);
-          }
-        })
-        .catch((err) => console.error(err));
+      return;
     }
+
+    // Load hotels from backend with Authorization header
+    fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (res.status === 401) { handleUnauthorized(); return null; }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || !Array.isArray(data)) return;
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night),
+          imageUrl: h.image_url,
+          gallery: [h.image_url],
+          amenities: h.amenities,
+          category: h.category,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id,
+            name: r.room_name,
+            bedType: r.bed_type,
+            price: parseFloat(r.price_per_night),
+            amenities: [...r.features, ...r.extra_features],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+          status: "Active",
+          revenue: 0,
+          bookings: 0,
+          roomsCount: h.rooms ? h.rooms.length : 0,
+          ownerEmail: auth,
+        }));
+        setHotels(mapped);
+      })
+      .catch((err) => console.error(err));
   }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("ownerLoggedIn");
     localStorage.removeItem("ownerLoggedInId");
+    localStorage.removeItem("ownerToken");
     router.push("/");
   };
 
@@ -141,9 +164,7 @@ export default function OwnersDashboard() {
     try {
       const response = await fetch("http://localhost:5000/api/hotels", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: ownerHeaders(),
         body: JSON.stringify({
           ownerId,
           ownerEmail: auth,
@@ -160,6 +181,7 @@ export default function OwnersDashboard() {
           amenities: selectedAmenities,
         }),
       });
+      if (response.status === 401) { handleUnauthorized(); return; }
 
       if (!response.ok) {
         alert("Failed to add hotel to the database.");
@@ -167,7 +189,9 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+      });
       const data = await res.json();
       if (Array.isArray(data)) {
         const mapped = data.map((h: any) => ({
@@ -243,9 +267,7 @@ export default function OwnersDashboard() {
     try {
       const response = await fetch("http://localhost:5000/api/rooms", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: ownerHeaders(),
         body: JSON.stringify({
           hotelId: selectedHotelId,
           roomName: roomNumber,
@@ -258,6 +280,7 @@ export default function OwnersDashboard() {
           mode: "active"
         }),
       });
+      if (response.status === 401) { handleUnauthorized(); return; }
 
       if (!response.ok) {
         alert("Failed to add room to database.");
@@ -265,7 +288,9 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to get updated rooms
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+      });
       const data = await res.json();
       if (Array.isArray(data)) {
         const mapped = data.map((h: any) => ({
@@ -329,8 +354,9 @@ export default function OwnersDashboard() {
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setRoomImages((prev) => [...prev, reader.result].slice(0, 6));
+        const result = reader.result;
+        if (typeof result === "string") {
+          setRoomImages((prev) => [...prev, result].slice(0, 6));
         }
       };
       reader.readAsDataURL(file);
@@ -349,9 +375,7 @@ export default function OwnersDashboard() {
     try {
       const response = await fetch(`http://localhost:5000/api/rooms/${room.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: ownerHeaders(),
         body: JSON.stringify({
           roomName: room.name,
           bedType: room.bedType,
@@ -363,6 +387,7 @@ export default function OwnersDashboard() {
           maxPersonCount: room.capacity,
         }),
       });
+      if (response.status === 401) { handleUnauthorized(); return; }
 
       if (!response.ok) {
         alert("Failed to update room status.");
@@ -370,7 +395,9 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to sync
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+      });
       const data = await res.json();
       if (Array.isArray(data)) {
         const mapped = data.map((h: any) => ({
@@ -436,9 +463,7 @@ export default function OwnersDashboard() {
     try {
       const response = await fetch(`http://localhost:5000/api/rooms/${editingRoomId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: ownerHeaders(),
         body: JSON.stringify({
           roomName: roomNumber,
           bedType: roomBedRoom || "Double Bed",
@@ -450,6 +475,7 @@ export default function OwnersDashboard() {
           maxPersonCount: parseInt(roomPersonCount) || 2,
         }),
       });
+      if (response.status === 401) { handleUnauthorized(); return; }
 
       if (!response.ok) {
         alert("Failed to modify room in database.");
@@ -457,7 +483,9 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to get updated rooms
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`);
+      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+      });
       const data = await res.json();
       if (Array.isArray(data)) {
         const mapped = data.map((h: any) => ({

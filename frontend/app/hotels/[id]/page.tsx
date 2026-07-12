@@ -13,7 +13,7 @@ export default function HotelPage() {
 
   useEffect(() => {
     if (id) {
-      fetch(`http://localhost:5000/api/hotels/${id}`)
+      fetch(`http://localhost:5000/api/hotels/${id}`, { cache: "no-store" })
         .then((res) => {
           if (!res.ok) throw new Error("Hotel not found");
           return res.json();
@@ -29,17 +29,17 @@ export default function HotelPage() {
             stars: h.stars,
             rating: 5.0,
             reviewCount: 1,
-            price: parseFloat(h.starting_price_per_night),
-            imageUrl: h.image_url,
-            gallery: [h.image_url],
-            amenities: h.amenities,
-            category: h.category.toLowerCase(),
+            price: parseFloat(h.starting_price_per_night) || 0,
+            imageUrl: h.image_url || "",
+            gallery: h.image_url ? [h.image_url] : [],
+            amenities: h.amenities || [],
+            category: (h.category || "luxury").toLowerCase(),
             rooms: (h.rooms || []).map((r: any) => ({
               id: r.id,
-              name: r.room_name,
-              bedType: r.bed_type,
-              price: parseFloat(r.price_per_night),
-              amenities: [...r.features, ...r.extra_features],
+              name: r.room_name || "",
+              bedType: r.bed_type || "",
+              price: parseFloat(r.price_per_night) || 0,
+              amenities: [...(r.features || []), ...(r.extra_features || [])],
               images: r.image_urls || [],
               mode: r.mode || "active",
               capacity: r.max_person_count || 2,

@@ -86,7 +86,7 @@ const getRoomsByHotel = async (hotelId) => {
   const query = `
     SELECT * FROM rooms
     WHERE hotel_id = $1
-    ORDER BY created_at DESC;
+    ORDER BY id DESC;
   `;
   const { rows } = await pool.query(query, [hotelId]);
   return rows;

@@ -16,15 +16,19 @@ export default function HotelsPage() {
   const [hotels, setHotels] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("all");
-  const [maxPrice, setMaxPrice] = useState(50000);
+  const [maxPrice, setMaxPrice] = useState(250000);
   const [minStars, setMinStars] = useState(0);
   const [sort, setSort] = useState<SortKey>("rating");
 
   useEffect(() => {
     setMounted(true);
-    fetch("http://localhost:5000/api/hotels")
+    fetch("http://localhost:5000/api/hotels", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          setHotels(HOTELS);
+          return;
+        }
         const mapped = data.map((h: any) => ({
           id: h.id,
           name: h.property_name,
@@ -35,17 +39,17 @@ export default function HotelsPage() {
           stars: h.stars,
           rating: 5.0,
           reviewCount: 1,
-          price: parseFloat(h.starting_price_per_night),
-          imageUrl: h.image_url,
-          gallery: [h.image_url],
-          amenities: h.amenities,
-          category: h.category.toLowerCase(),
+          price: parseFloat(h.starting_price_per_night) || 0,
+          imageUrl: h.image_url || "",
+          gallery: h.image_url ? [h.image_url] : [],
+          amenities: h.amenities || [],
+          category: (h.category || "luxury").toLowerCase(),
           rooms: (h.rooms || []).map((r: any) => ({
             id: r.id,
-            name: r.room_name,
-            bedType: r.bed_type,
-            price: parseFloat(r.price_per_night),
-            amenities: [...r.features, ...r.extra_features],
+            name: r.room_name || "",
+            bedType: r.bed_type || "",
+            price: parseFloat(r.price_per_night) || 0,
+            amenities: [...(r.features || []), ...(r.extra_features || [])],
             images: r.image_urls || [],
             mode: r.mode || "active",
             capacity: r.max_person_count || 2,
@@ -53,7 +57,10 @@ export default function HotelsPage() {
         }));
         setHotels(mapped);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error("API error, falling back to mock hotels data:", err);
+        setHotels(HOTELS);
+      });
   }, []);
 
   const filtered = useMemo(() => {
@@ -145,13 +152,13 @@ export default function HotelsPage() {
                   Max Price: <span className="text-gold-500">LKR {maxPrice.toLocaleString()}</span>/night
                 </label>
                 <input
-                  type="range" min={1000} max={50000} step={500}
+                  type="range" min={1000} max={250000} step={1000}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(+e.target.value)}
                   className="w-full accent-gold-500"
                 />
                 <div className="flex justify-between text-slate-600 text-xs mt-1">
-                  <span>LKR 1,000</span><span>LKR 50,000</span>
+                  <span>LKR 1,000</span><span>LKR 250,000</span>
                 </div>
               </div>
 

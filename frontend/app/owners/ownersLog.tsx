@@ -60,6 +60,7 @@ export default function OwnersLoginPage() {
 
       localStorage.setItem("ownerLoggedIn", emailLower);
       localStorage.setItem("ownerLoggedInId", data.owner.id);
+      localStorage.setItem("ownerToken", data.token);
       router.push("/owners/dashboard");
     } catch (err) {
       setIsLoading(false);

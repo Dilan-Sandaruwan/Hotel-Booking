@@ -51,9 +51,13 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    fetch("http://localhost:5000/api/hotels")
+    fetch("http://localhost:5000/api/hotels", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          setHotels(HOTELS);
+          return;
+        }
         const mapped = data.map((h: any) => ({
           id: h.id,
           name: h.property_name,
@@ -64,17 +68,17 @@ export default function Home() {
           stars: h.stars,
           rating: 5.0,
           reviewCount: 1,
-          price: parseFloat(h.starting_price_per_night),
-          imageUrl: h.image_url,
-          gallery: [h.image_url],
-          amenities: h.amenities,
-          category: h.category.toLowerCase(),
+          price: parseFloat(h.starting_price_per_night) || 0,
+          imageUrl: h.image_url || "",
+          gallery: h.image_url ? [h.image_url] : [],
+          amenities: h.amenities || [],
+          category: (h.category || "luxury").toLowerCase(),
           rooms: (h.rooms || []).map((r: any) => ({
             id: r.id,
-            name: r.room_name,
-            bedType: r.bed_type,
-            price: parseFloat(r.price_per_night),
-            amenities: [...r.features, ...r.extra_features],
+            name: r.room_name || "",
+            bedType: r.bed_type || "",
+            price: parseFloat(r.price_per_night) || 0,
+            amenities: [...(r.features || []), ...(r.extra_features || [])],
             images: r.image_urls || [],
             mode: r.mode || "active",
             capacity: r.max_person_count || 2,
@@ -82,10 +86,13 @@ export default function Home() {
         }));
         setHotels(mapped);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error("API error, falling back to mock hotels data:", err);
+        setHotels(HOTELS);
+      });
   }, []);
 
-  const featured = mounted ? hotels.slice(0, 6) : [];
+  const featured = mounted ? hotels : [];
 
   return (
     <>
@@ -149,7 +156,7 @@ export default function Home() {
 
                     {/* Amenity tags */}
                     <div className="flex flex-wrap gap-1.5 mb-5">
-                      {hotel.amenities.slice(0, 3).map((a) => (
+                      {hotel.amenities.slice(0, 3).map((a: string) => (
                         <span
                           key={a}
                           className="px-2.5 py-0.5 bg-gold-500/8 border border-gold-500/20 rounded-full text-xs text-slate-400"

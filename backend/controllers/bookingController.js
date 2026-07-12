@@ -1,0 +1,117 @@
+const bookingModel = require("../models/bookingModel");
+
+/**
+ * POST /api/bookings
+ * Body: { userId?, hotelId, roomId, firstName, lastName, email, phone,
+ *         specialRequests?, checkInDate, checkOutDate, numberOfNights,
+ *         numberOfGuests, pricePerNight, baseTotal, taxesAndFees, totalAmount }
+ */
+const create = async (req, res) => {
+  try {
+    const {
+      userId,
+      hotelId,
+      roomId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      specialRequests,
+      checkInDate,
+      checkOutDate,
+      numberOfNights,
+      numberOfGuests,
+      pricePerNight,
+      baseTotal,
+      taxesAndFees,
+      totalAmount,
+    } = req.body;
+
+    // --- Basic validation ---
+    if (
+      !hotelId ||
+      !roomId ||
+      !firstName ||
+      !lastName ||
+      !email ||
+      !phone ||
+      !checkInDate ||
+      !checkOutDate ||
+      !numberOfNights ||
+      !numberOfGuests ||
+      pricePerNight === undefined ||
+      baseTotal === undefined ||
+      taxesAndFees === undefined ||
+      totalAmount === undefined
+    ) {
+      return res.status(400).json({ error: "Missing required booking fields" });
+    }
+
+    const booking = await bookingModel.createBooking({
+      userId: userId || null,
+      hotelId,
+      roomId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      specialRequests,
+      checkInDate,
+      checkOutDate,
+      numberOfNights: Number(numberOfNights),
+      numberOfGuests: Number(numberOfGuests),
+      pricePerNight: Number(pricePerNight),
+      baseTotal: Number(baseTotal),
+      taxesAndFees: Number(taxesAndFees),
+      totalAmount: Number(totalAmount),
+      paymentStatus: "paid",
+      bookingStatus: "confirmed",
+    });
+
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Booking creation error:", error);
+    res.status(500).json({ error: "Server error during booking creation" });
+  }
+};
+
+/**
+ * GET /api/bookings/user/:userId
+ * Returns all bookings for a user including hotel/room details.
+ */
+const getByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+    const bookings = await bookingModel.getBookingsByUser(userId);
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Get bookings error:", error);
+    res.status(500).json({ error: "Server error retrieving bookings" });
+  }
+};
+
+/**
+ * GET /api/bookings/:id
+ * Returns a single booking by its UUID.
+ */
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await bookingModel.getBookingById(id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+    res.status(200).json(booking);
+  } catch (error) {
+    console.error("Get booking error:", error);
+    res.status(500).json({ error: "Server error retrieving booking" });
+  }
+};
+
+module.exports = { create, getByUser, getById };

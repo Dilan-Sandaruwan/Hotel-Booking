@@ -54,7 +54,7 @@ const getHotelsByOwner = async (ownerId) => {
   const query = `
     SELECT * FROM hotels
     WHERE owner_id = $1
-    ORDER BY created_at DESC;
+    ORDER BY id DESC;
   `;
   const { rows } = await pool.query(query, [ownerId]);
   return rows;
@@ -63,7 +63,7 @@ const getHotelsByOwner = async (ownerId) => {
 const getAllHotels = async () => {
   const query = `
     SELECT * FROM hotels
-    ORDER BY created_at DESC;
+    ORDER BY id DESC;
   `;
   const { rows } = await pool.query(query);
   return rows;

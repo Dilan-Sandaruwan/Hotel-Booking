@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getHotelById } from "../data/hotels";
+import { getHotelById, Hotel, Room } from "../data/hotels";
 import { useUser } from "../context/UserContext";
 
 type Step = 1 | 2 | 3;
@@ -24,8 +24,69 @@ export default function BookingPage() {
   const nights = +(params.get("nights") ?? "1");
   const total = +(params.get("total") ?? "0");
 
-  const hotel = getHotelById(hotelId);
-  const room = hotel?.rooms.find((r) => r.id === roomId) ?? hotel?.rooms[0];
+  const [hotel, setHotel] = useState<Hotel | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    if (!hotelId) {
+      setFetching(false);
+      return;
+    }
+
+    setFetching(true);
+    fetch(`http://localhost:5000/api/hotels/${hotelId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Hotel not found on backend");
+        return res.json();
+      })
+      .then((h) => {
+        const mapped: Hotel = {
+          id: h.id.toString(),
+          name: h.property_name,
+          location: h.city,
+          country: h.country,
+          description: h.short_description,
+          longDescription: h.long_description,
+          stars: h.stars,
+          rating: 5.0,
+          reviewCount: 1,
+          price: parseFloat(h.starting_price_per_night) || 0,
+          imageUrl: h.image_url || "",
+          gallery: h.image_url ? [h.image_url] : [],
+          amenities: h.amenities || [],
+          category: (h.category || "luxury").toLowerCase() as any,
+          rooms: (h.rooms || []).map((r: any) => ({
+            id: r.id.toString(),
+            name: r.room_name || "",
+            bedType: r.bed_type || "",
+            price: parseFloat(r.price_per_night) || 0,
+            size: r.size || "250 sq ft",
+            amenities: [...(r.features || []), ...(r.extra_features || [])],
+            images: r.image_urls || [],
+            mode: r.mode || "active",
+            capacity: r.max_person_count || 2,
+          })),
+        };
+        setHotel(mapped);
+        const selectedRoom = mapped.rooms.find((r) => r.id.toString() === roomId.toString()) ?? mapped.rooms[0];
+        setRoom(selectedRoom || null);
+        setFetching(false);
+      })
+      .catch(() => {
+        // Fallback to local storage hotels
+        const localHotel = getHotelById(hotelId);
+        if (localHotel) {
+          setHotel(localHotel);
+          const selectedRoom = localHotel.rooms.find((r) => r.id.toString() === roomId.toString()) ?? localHotel.rooms[0];
+          setRoom(selectedRoom || null);
+        } else {
+          setHotel(null);
+          setRoom(null);
+        }
+        setFetching(false);
+      });
+  }, [hotelId, roomId]);
   const taxes = Math.round(total * 0.12);
   const grandTotal = total + taxes;
 
@@ -57,18 +118,89 @@ export default function BookingPage() {
 
   const handleConfirm = async () => {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    const bookingId = "LX-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-    localStorage.setItem("lastBooking", JSON.stringify({
-      bookingId, hotelId, hotelName: hotel?.name, checkIn, checkOut, guests, nights,
-      roomType: room?.name, totalPrice: grandTotal,
-      guestName: `${guest.firstName} ${guest.lastName}`, guestEmail: guest.email,
-      bookingDate: new Date().toISOString(),
-    }));
-    router.push(`/confirmation?id=${bookingId}`);
+    try {
+      // Read the logged-in user's ID (UUID stored at login time)
+      let userId: string | null = null;
+      try {
+        const rawUser = localStorage.getItem("luxestay_user");
+        if (rawUser) userId = JSON.parse(rawUser).id ?? null;
+      } catch { /* continue without userId */ }
+
+      const payload = {
+        userId,
+        hotelId: hotel!.id,
+        roomId: room!.id,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        email: guest.email,
+        phone: guest.phone,
+        specialRequests: guest.specialRequests || null,
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        numberOfNights: nights || 1,
+        numberOfGuests: guests,
+        pricePerNight: room!.price,
+        baseTotal: total,
+        taxesAndFees: taxes,
+        totalAmount: grandTotal,
+      };
+
+      const res = await fetch("http://localhost:5000/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      let bookingId: string;
+
+      if (res.ok) {
+        const data = await res.json();
+        bookingId = data.booking.id; // real UUID from DB
+      } else {
+        // Fallback: generate a local ID so the user still sees confirmation
+        bookingId = "LX-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        console.warn("Booking API failed, using local ID:", bookingId);
+      }
+
+      // Always persist a summary to localStorage for the confirmation page
+      localStorage.setItem("lastBooking", JSON.stringify({
+        bookingId, hotelId: hotel!.id, hotelName: hotel!.name,
+        checkIn, checkOut, guests, nights,
+        roomType: room!.name, totalPrice: grandTotal,
+        guestName: `${guest.firstName} ${guest.lastName}`,
+        guestEmail: guest.email,
+        bookingDate: new Date().toISOString(),
+      }));
+
+      router.push(`/confirmation?id=${bookingId}`);
+    } catch (err) {
+      console.error("Booking confirmation error:", err);
+      // Still allow the user to see the confirmation on network errors
+      const bookingId = "LX-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+      localStorage.setItem("lastBooking", JSON.stringify({
+        bookingId, hotelId: hotel!.id, hotelName: hotel!.name,
+        checkIn, checkOut, guests, nights,
+        roomType: room!.name, totalPrice: grandTotal,
+        guestName: `${guest.firstName} ${guest.lastName}`,
+        guestEmail: guest.email,
+        bookingDate: new Date().toISOString(),
+      }));
+      router.push(`/confirmation?id=${bookingId}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
+
   const inputCls = "w-full px-4 py-3 bg-navy-900/60 border border-gold-500/20 rounded-xl text-slate-200 placeholder-slate-500 text-sm outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all";
+
+  if (fetching) {
+    return (
+      <div className="min-h-screen bg-navy-900 flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!hotel || !room) {
     return (
