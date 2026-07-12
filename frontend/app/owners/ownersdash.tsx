@@ -74,6 +74,11 @@ export default function OwnersDashboard() {
   const [isEditRoomOpen, setIsEditRoomOpen] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState("");
 
+  // Bookings state (owner dashboard — all guest reservations)
+  const [guestBookings, setGuestBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+
   // ── JWT helpers ─────────────────────────────────────────────────────────
   /** Returns headers including the owner JWT for protected API calls. */
   const ownerHeaders = () => ({
@@ -152,6 +157,27 @@ export default function OwnersDashboard() {
     localStorage.removeItem("ownerToken");
     router.push("/");
   };
+
+  // ── Fetch guest bookings when bookings tab is opened ─────────────────────
+  useEffect(() => {
+    if (activeTab !== "bookings") return;
+    const ownerId = localStorage.getItem("ownerLoggedInId");
+    if (!ownerId) return;
+    setBookingsLoading(true);
+    fetch(`http://localhost:5000/api/bookings/owner/${ownerId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
+    })
+      .then((res) => {
+        if (res.status === 401) { handleUnauthorized(); return null; }
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setGuestBookings(data);
+        setBookingsLoading(false);
+      })
+      .catch((err) => { console.error(err); setBookingsLoading(false); });
+  }, [activeTab]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleAddHotel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1273,17 +1299,132 @@ export default function OwnersDashboard() {
         {/* Render Bookings Tab */}
         {activeTab === "bookings" && (
           <div className="animate-fade-in">
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold font-display text-white">Recent Guest Reservations</h2>
-              <p className="text-slate-500 text-sm mt-1">Review live check-in, check-out dates, and status of recent stays</p>
+            <div className="mb-8 flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="text-2xl font-bold font-display text-white">Guest Reservations</h2>
+                <p className="text-slate-500 text-sm mt-1">All bookings across your properties — live from the database</p>
+              </div>
+              {/* Summary pills */}
+              <div className="flex gap-3">
+                <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <p className="text-emerald-400 font-black text-lg">{guestBookings.filter(b => b.booking_status === "confirmed").length}</p>
+                  <p className="text-emerald-600 text-[10px] font-bold uppercase tracking-widest">Confirmed</p>
+                </div>
+                <div className="px-4 py-2 rounded-xl bg-gold-500/10 border border-gold-500/20 text-center">
+                  <p className="text-gold-400 font-black text-lg">LKR {guestBookings.reduce((s, b) => s + Number(b.total_amount || 0), 0).toLocaleString()}</p>
+                  <p className="text-gold-600 text-[10px] font-bold uppercase tracking-widest">Total Revenue</p>
+                </div>
+              </div>
             </div>
 
-            <div className="glass p-6 md:p-8 rounded-2xl">
-              <div className="text-center py-12">
-                <div className="text-4xl mb-3">📅</div>
-                <p className="text-slate-400 font-medium">No guest reservations found.</p>
-                <p className="text-slate-600 text-xs mt-1">Bookings for your listed properties will appear here.</p>
-              </div>
+            <div className="glass rounded-2xl overflow-hidden">
+              {bookingsLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <span className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : guestBookings.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="text-5xl mb-3">📅</div>
+                  <p className="text-slate-400 font-medium">No guest reservations found.</p>
+                  <p className="text-slate-600 text-xs mt-1">Bookings for your listed properties will appear here once guests book.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-gold-500/10 text-slate-500 text-xs font-bold uppercase tracking-widest">
+                        <th className="py-4 px-4">Booking</th>
+                        <th className="py-4 px-4">Guest</th>
+                        <th className="py-4 px-4">Hotel</th>
+                        <th className="py-4 px-4">Room</th>
+                        <th className="py-4 px-4">Check-In</th>
+                        <th className="py-4 px-4">Check-Out</th>
+                        <th className="py-4 px-4">Nights</th>
+                        <th className="py-4 px-4">Amount</th>
+                        <th className="py-4 px-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gold-500/5">
+                      {guestBookings.map((b) => {
+                        const shortId = b.id.split("-")[0].toUpperCase();
+                        const checkIn  = new Date(b.check_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        const checkOut = new Date(b.check_out_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        const statusCls = b.booking_status === "confirmed"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : b.booking_status === "pending"
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : "bg-red-500/10 text-red-400 border-red-500/20";
+
+                        return (
+                          <React.Fragment key={b.id}>
+                            <tr
+                              onClick={() => setExpandedBookingId(expandedBookingId === b.id ? null : b.id)}
+                              className="hover:bg-gold-500/3 transition-colors cursor-pointer"
+                            >
+                              <td className="py-4 px-4">
+                                <p className="text-gold-500 font-mono font-bold text-xs"># {shortId}</p>
+                                <p className="text-slate-600 text-xs mt-0.5">{new Date(b.created_at).toLocaleDateString()}</p>
+                              </td>
+                              <td className="py-4 px-4">
+                                <p className="text-slate-200 font-semibold">{b.first_name} {b.last_name}</p>
+                                <p className="text-slate-500 text-xs">{b.email}</p>
+                              </td>
+                              <td className="py-4 px-4">
+                                <p className="text-slate-300 font-medium">{b.hotel_name}</p>
+                                <p className="text-slate-500 text-xs">📍 {b.hotel_city}</p>
+                              </td>
+                              <td className="py-4 px-4 text-slate-400">{b.room_name || "—"}</td>
+                              <td className="py-4 px-4 text-slate-300">{checkIn}</td>
+                              <td className="py-4 px-4 text-slate-300">{checkOut}</td>
+                              <td className="py-4 px-4 text-slate-400 text-center">{b.number_of_nights}</td>
+                              <td className="py-4 px-4">
+                                <p className="text-gold-400 font-black">LKR {Number(b.total_amount).toLocaleString()}</p>
+                                <p className="text-slate-600 text-xs">{b.number_of_guests} guest{b.number_of_guests !== 1 ? "s" : ""}</p>
+                              </td>
+                              <td className="py-4 px-4 text-right">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border capitalize ${statusCls}`}>
+                                  {b.booking_status}
+                                </span>
+                              </td>
+                            </tr>
+                            {/* Expanded detail row */}
+                            {expandedBookingId === b.id && (
+                              <tr key={b.id + "-detail"} className="bg-navy-800/40">
+                                <td colSpan={9} className="px-6 py-4">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Phone</p>
+                                      <p className="text-slate-300">{b.phone || "—"}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Base Total</p>
+                                      <p className="text-slate-300">LKR {Number(b.base_total).toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Taxes & Fees</p>
+                                      <p className="text-slate-300">LKR {Number(b.taxes_and_fees).toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Payment</p>
+                                      <p className="text-emerald-400 font-semibold capitalize">{b.payment_status}</p>
+                                    </div>
+                                    {b.special_requests && (
+                                      <div className="col-span-2 md:col-span-4">
+                                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-1">Special Requests</p>
+                                        <p className="text-slate-400 italic">{b.special_requests}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { HOTELS } from "../data/hotels";
 
 type Category = "all" | "luxury" | "boutique" | "resort" | "business";
 type SortKey = "price-asc" | "price-desc" | "rating" | "name";
@@ -14,6 +13,7 @@ function StarRating({ count }: { count: number }) {
 export default function HotelsPage() {
   const [mounted, setMounted] = useState(false);
   const [hotels, setHotels] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("all");
   const [maxPrice, setMaxPrice] = useState(250000);
@@ -22,44 +22,44 @@ export default function HotelsPage() {
 
   useEffect(() => {
     setMounted(true);
+    setLoading(true);
     fetch("http://localhost:5000/api/hotels", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        if (!data || !Array.isArray(data) || data.length === 0) {
-          setHotels(HOTELS);
-          return;
+        if (Array.isArray(data)) {
+          const mapped = data.map((h: any) => ({
+            id: h.id,
+            name: h.property_name,
+            location: h.city,
+            country: h.country,
+            description: h.short_description,
+            longDescription: h.long_description,
+            stars: h.stars,
+            rating: 5.0,
+            reviewCount: 1,
+            price: parseFloat(h.starting_price_per_night) || 0,
+            imageUrl: h.image_url || "",
+            gallery: h.image_url ? [h.image_url] : [],
+            amenities: h.amenities || [],
+            category: (h.category || "luxury").toLowerCase(),
+            rooms: (h.rooms || []).map((r: any) => ({
+              id: r.id,
+              name: r.room_name || "",
+              bedType: r.bed_type || "",
+              price: parseFloat(r.price_per_night) || 0,
+              amenities: [...(r.features || []), ...(r.extra_features || [])],
+              images: r.image_urls || [],
+              mode: r.mode || "active",
+              capacity: r.max_person_count || 2,
+            })),
+          }));
+          setHotels(mapped);
         }
-        const mapped = data.map((h: any) => ({
-          id: h.id,
-          name: h.property_name,
-          location: h.city,
-          country: h.country,
-          description: h.short_description,
-          longDescription: h.long_description,
-          stars: h.stars,
-          rating: 5.0,
-          reviewCount: 1,
-          price: parseFloat(h.starting_price_per_night) || 0,
-          imageUrl: h.image_url || "",
-          gallery: h.image_url ? [h.image_url] : [],
-          amenities: h.amenities || [],
-          category: (h.category || "luxury").toLowerCase(),
-          rooms: (h.rooms || []).map((r: any) => ({
-            id: r.id,
-            name: r.room_name || "",
-            bedType: r.bed_type || "",
-            price: parseFloat(r.price_per_night) || 0,
-            amenities: [...(r.features || []), ...(r.extra_features || [])],
-            images: r.image_urls || [],
-            mode: r.mode || "active",
-            capacity: r.max_person_count || 2,
-          })),
-        }));
-        setHotels(mapped);
+        setLoading(false);
       })
       .catch((err) => {
-        console.error("API error, falling back to mock hotels data:", err);
-        setHotels(HOTELS);
+        console.error("Failed to fetch hotels:", err);
+        setLoading(false);
       });
   }, []);
 
@@ -81,7 +81,7 @@ export default function HotelsPage() {
       return 0;
     });
     return list;
-  }, [search, category, maxPrice, minStars, sort]);
+  }, [hotels, search, category, maxPrice, minStars, sort, mounted]);
 
   const CATEGORIES: { label: string; value: Category }[] = [
     { label: "All", value: "all" },
@@ -215,11 +215,22 @@ export default function HotelsPage() {
             </div>
 
             {/* Grid */}
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="glass p-16 flex flex-col items-center justify-center gap-4">
+                <span className="w-10 h-10 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-slate-500 text-sm">Loading properties from database…</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="glass p-16 text-center">
                 <div className="text-5xl mb-4">🔍</div>
-                <h3 className="text-slate-100 mb-2">No hotels found</h3>
-                <p className="text-slate-500">Try adjusting your filters or search query.</p>
+                <h3 className="text-slate-100 mb-2">
+                  {hotels.length === 0 ? "No properties registered yet" : "No hotels found"}
+                </h3>
+                <p className="text-slate-500">
+                  {hotels.length === 0
+                    ? "Owners can list their properties from the Owner Portal."
+                    : "Try adjusting your filters or search query."}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">

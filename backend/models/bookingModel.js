@@ -115,8 +115,30 @@ const getBookingById = async (id) => {
   return rows[0];
 };
 
+/**
+ * Retrieve all bookings for every hotel owned by a given ownerId.
+ */
+const getBookingsByOwner = async (ownerId) => {
+  const query = `
+    SELECT
+      b.*,
+      h.property_name AS hotel_name,
+      h.city          AS hotel_city,
+      h.image_url     AS hotel_image,
+      r.room_name
+    FROM bookings b
+    INNER JOIN hotels h ON b.hotel_id = h.id
+    LEFT  JOIN rooms  r ON b.room_id  = r.id
+    WHERE h.owner_id = $1
+    ORDER BY b.created_at DESC;
+  `;
+  const { rows } = await pool.query(query, [ownerId]);
+  return rows;
+};
+
 module.exports = {
   createBooking,
   getBookingsByUser,
+  getBookingsByOwner,
   getBookingById,
 };

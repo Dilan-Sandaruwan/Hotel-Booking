@@ -114,4 +114,23 @@ const getById = async (req, res) => {
   }
 };
 
-module.exports = { create, getByUser, getById };
+/**
+ * GET /api/bookings/owner/:ownerId
+ * Returns all bookings across every hotel owned by the given owner.
+ * Protected by authOwner middleware in the route.
+ */
+const getByOwner = async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+    if (!ownerId) {
+      return res.status(400).json({ error: "ownerId is required" });
+    }
+    const bookings = await bookingModel.getBookingsByOwner(ownerId);
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Get owner bookings error:", error);
+    res.status(500).json({ error: "Server error retrieving owner bookings" });
+  }
+};
+
+module.exports = { create, getByUser, getByOwner, getById };

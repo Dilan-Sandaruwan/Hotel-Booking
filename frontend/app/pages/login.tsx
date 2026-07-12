@@ -49,6 +49,7 @@ export default function LoginPage() {
       const lastName = names.slice(1).join(" ") || "User";
 
       const matchedUser = {
+        id: data.user.id,
         firstName: firstName,
         lastName: lastName,
         email: data.user.email,
