@@ -203,39 +203,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-7">
-            <div className="flex-1 h-px bg-gold-500/10" />
-            <span className="text-slate-600 text-xs tracking-widest uppercase">or continue with</span>
-            <div className="flex-1 h-px bg-gold-500/10" />
-          </div>
 
-          {/* Social buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              id="login-google"
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 rounded-xl border border-gold-500/15 bg-navy-800/40 text-slate-300 text-sm font-medium hover:border-gold-500/30 hover:bg-navy-800/60 transition-all cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M5.27 9.76A7.08 7.08 0 0 1 12 4.93c1.7 0 3.23.62 4.43 1.63l3.3-3.3A11.94 11.94 0 0 0 12 1C8.25 1 4.98 3 3.06 6.04l2.21 3.72Z"/>
-                <path fill="#34A853" d="M16.04 18.01A7.07 7.07 0 0 1 12 19.07c-2.86 0-5.32-1.69-6.53-4.14l-3.39 2.6A11.96 11.96 0 0 0 12 23c2.97 0 5.69-1.07 7.77-2.82l-3.73-2.17Z"/>
-                <path fill="#4A90D9" d="M19.77 20.18A11.94 11.94 0 0 0 23 13c0-.74-.07-1.46-.19-2.16H12v4.55h6.18a5.25 5.25 0 0 1-2.37 3.44l3.96 2.35Z"/>
-                <path fill="#FBBC05" d="M5.47 14.93A7.16 7.16 0 0 1 4.93 12c0-.68.1-1.34.27-1.97L3 7.29A11.94 11.94 0 0 0 1 12c0 1.92.45 3.73 1.24 5.34l3.23-2.41Z"/>
-              </svg>
-              Google
-            </button>
-            <button
-              id="login-apple"
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 rounded-xl border border-gold-500/15 bg-navy-800/40 text-slate-300 text-sm font-medium hover:border-gold-500/30 hover:bg-navy-800/60 transition-all cursor-pointer"
-            >
-              <svg className="w-4 h-4 fill-slate-200" viewBox="0 0 24 24">
-                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.32.07 2.23.72 3 .76 1.16-.23 2.28-.9 3.5-.84 1.5.1 2.63.64 3.36 1.64-3.08 1.85-2.36 5.6.14 6.72-.43 1.18-.99 2.35-2 3.6ZM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25Z"/>
-              </svg>
-              Apple
-            </button>
-          </div>
 
           {/* Sign up link */}
           <p className="text-center text-slate-500 text-sm mt-8">
