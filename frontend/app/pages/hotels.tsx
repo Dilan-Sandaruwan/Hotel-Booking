@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { API_BASE_URL } from "../config";
 
 type Category = "all" | "luxury" | "boutique" | "resort" | "business";
 type SortKey = "price-asc" | "price-desc" | "rating" | "name";
@@ -23,7 +24,7 @@ export default function HotelsPage() {
   useEffect(() => {
     setMounted(true);
     setLoading(true);
-    fetch("http://localhost:5000/api/hotels", { cache: "no-store" })
+    fetch(`${API_BASE_URL}/api/hotels`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

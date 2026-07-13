@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "../config";
 import { Hotel, Room } from "../data/hotels";
 import RoomDetailModal from "../components/room";
 
@@ -39,7 +40,7 @@ export default function HotelDetail({ hotel }: Props) {
     if (diff <= 0) return;
 
     const params = new URLSearchParams({ roomId: selectedRoom, checkIn, checkOut });
-    fetch(`http://localhost:5000/api/bookings/check-availability?${params}`)
+    fetch(`${API_BASE_URL}/api/bookings/check-availability?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setRoomAvailable(data.available);

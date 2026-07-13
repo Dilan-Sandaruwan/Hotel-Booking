@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getHotelById, Hotel, Room } from "../data/hotels";
 import { useUser } from "../context/UserContext";
+import { API_BASE_URL } from "../config";
 
 type Step = 1 | 2 | 3;
 
@@ -35,7 +36,7 @@ export default function BookingPage() {
     }
 
     setFetching(true);
-    fetch(`http://localhost:5000/api/hotels/${hotelId}`)
+    fetch(`${API_BASE_URL}/api/hotels/${hotelId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Hotel not found on backend");
         return res.json();
@@ -145,7 +146,7 @@ export default function BookingPage() {
         totalAmount: grandTotal,
       };
 
-      const res = await fetch("http://localhost:5000/api/bookings", {
+      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

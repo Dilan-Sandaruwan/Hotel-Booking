@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { HOTELS } from "../data/hotels";
+import { API_BASE_URL } from "../config";
 
 const AMENITIES = [
   { icon: "🏊", title: "Pool & Spa", desc: "World-class pools and rejuvenating spa treatments." },
@@ -51,7 +52,7 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    fetch("http://localhost:5000/api/hotels", { cache: "no-store" })
+    fetch(`${API_BASE_URL}/api/hotels`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (!data || !Array.isArray(data) || data.length === 0) {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser } from "../context/UserContext";
+import { API_BASE_URL } from "../config";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -32,7 +33,7 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/hotels")
+    fetch(`${API_BASE_URL}/api/hotels`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

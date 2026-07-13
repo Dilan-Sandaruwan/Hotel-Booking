@@ -4,7 +4,77 @@ const seedDatabase = async () => {
   try {
     console.log("🌱 Checking if database seeding is required...");
 
-    // ── 0. Schema Migration: create bookings table if it doesn't exist ──
+    // ── 0. Schema Migration: Create all tables in order if they don't exist ──
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        terms_accepted BOOLEAN NOT NULL DEFAULT false,
+        auth_provider VARCHAR(50) DEFAULT 'local',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ users table ready.");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS owners (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name VARCHAR(255) NOT NULL,
+        birthday DATE,
+        contact_number VARCHAR(50),
+        business_email VARCHAR(255) UNIQUE NOT NULL,
+        national_id_passport VARCHAR(100),
+        password_hash VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ owners table ready.");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hotels (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        owner_id UUID REFERENCES owners(id) ON DELETE CASCADE,
+        property_name VARCHAR(255) NOT NULL,
+        city VARCHAR(255) NOT NULL,
+        country VARCHAR(255) NOT NULL,
+        starting_price_per_night NUMERIC(12, 2) NOT NULL,
+        category VARCHAR(100),
+        stars INTEGER,
+        total_rooms INTEGER,
+        image_url TEXT,
+        short_description TEXT,
+        long_description TEXT,
+        amenities TEXT[],
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ hotels table ready.");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rooms (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        hotel_id UUID REFERENCES hotels(id) ON DELETE CASCADE,
+        room_name VARCHAR(255) NOT NULL,
+        bed_type VARCHAR(100),
+        features TEXT[],
+        extra_features TEXT[],
+        price_per_night NUMERIC(12, 2) NOT NULL,
+        image_urls TEXT[],
+        mode VARCHAR(50) DEFAULT 'active',
+        max_person_count INTEGER DEFAULT 2,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ rooms table ready.");
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS bookings (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

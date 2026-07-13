@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "./sidebar";
 import OwnerProfile from "./OwnerProfile";
 import { HOTELS, addHotel } from "../data/hotels";
+import { API_BASE_URL } from "../config";
 
 const AMENITIES_BY_CATEGORY = {
   "Most Popular Facilities": [
@@ -121,7 +122,7 @@ export default function OwnersDashboard() {
     }
 
     // Load hotels from backend with Authorization header
-    fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+    fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -179,7 +180,7 @@ export default function OwnersDashboard() {
     const ownerId = localStorage.getItem("ownerLoggedInId");
     if (!ownerId) return;
     setBookingsLoading(true);
-    fetch(`http://localhost:5000/api/bookings/owner/${ownerId}`, {
+    fetch(`${API_BASE_URL}/api/bookings/owner/${ownerId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
     })
       .then((res) => {
@@ -233,7 +234,7 @@ export default function OwnersDashboard() {
     const ownerId = localStorage.getItem("ownerLoggedInId") || "";
 
     try {
-      const response = await fetch(`http://localhost:5000/api/hotels/${editingHotelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/hotels/${editingHotelId}`, {
         method: "PUT",
         headers: ownerHeaders(),
         body: JSON.stringify({
@@ -258,7 +259,7 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
       });
       const data = await res.json();
@@ -314,7 +315,7 @@ export default function OwnersDashboard() {
     const newPriceVal = parseFloat(newHotelPrice) || 10000;
 
     try {
-      const response = await fetch("http://localhost:5000/api/hotels", {
+      const response = await fetch(`${API_BASE_URL}/api/hotels`, {
         method: "POST",
         headers: ownerHeaders(),
         body: JSON.stringify({
@@ -341,7 +342,7 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
       });
       const data = await res.json();
@@ -418,7 +419,7 @@ export default function OwnersDashboard() {
     const ownerId = localStorage.getItem("ownerLoggedInId") || "";
 
     try {
-      const response = await fetch("http://localhost:5000/api/rooms", {
+      const response = await fetch(`${API_BASE_URL}/api/rooms`, {
         method: "POST",
         headers: ownerHeaders(),
         body: JSON.stringify({
@@ -441,7 +442,7 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to get updated rooms
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
       });
       const data = await res.json();
@@ -551,7 +552,7 @@ export default function OwnersDashboard() {
     const ownerId = localStorage.getItem("ownerLoggedInId") || "";
 
     try {
-      const response = await fetch(`http://localhost:5000/api/rooms/${room.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${room.id}`, {
         method: "PUT",
         headers: ownerHeaders(),
         body: JSON.stringify({
@@ -573,7 +574,7 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to sync
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
       });
       const data = await res.json();
@@ -639,7 +640,7 @@ export default function OwnersDashboard() {
       : [];
 
     try {
-      const response = await fetch(`http://localhost:5000/api/rooms/${editingRoomId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${editingRoomId}`, {
         method: "PUT",
         headers: ownerHeaders(),
         body: JSON.stringify({
@@ -661,7 +662,7 @@ export default function OwnersDashboard() {
       }
 
       // Reload hotels from backend to get updated rooms
-      const res = await fetch(`http://localhost:5000/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/hotels/owner/${ownerId || "null"}?email=${encodeURIComponent(auth)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ownerToken") || ""}` },
       });
       const data = await res.json();

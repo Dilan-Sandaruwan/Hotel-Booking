@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "../config";
 
 export default function OwnersSignupPage() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function OwnersSignupPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/owners/register", {
+      const response = await fetch(`${API_BASE_URL}/api/owners/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

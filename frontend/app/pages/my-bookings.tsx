@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "../context/UserContext";
+import { API_BASE_URL } from "../config";
 
 // ---------- Types ----------------------------------------------------------
 
@@ -75,7 +76,7 @@ export default function MyBookingsPage() {
     }
 
     setLoading(true);
-    fetch(`http://localhost:5000/api/bookings/user/${user.id}`)
+    fetch(`${API_BASE_URL}/api/bookings/user/${user.id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch bookings");
         return res.json();

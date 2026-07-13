@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, notFound } from "next/navigation";
 import HotelDetail from "../../pages/hotel-detail";
 import { getHotelById } from "../../data/hotels";
+import { API_BASE_URL } from "../../config";
 
 export default function HotelPage() {
   const params = useParams();
@@ -13,7 +14,7 @@ export default function HotelPage() {
 
   useEffect(() => {
     if (id) {
-      fetch(`http://localhost:5000/api/hotels/${id}`, { cache: "no-store" })
+      fetch(`${API_BASE_URL}/api/hotels/${id}`, { cache: "no-store" })
         .then((res) => {
           if (!res.ok) throw new Error("Hotel not found");
           return res.json();
